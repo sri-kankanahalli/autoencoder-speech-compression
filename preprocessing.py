@@ -10,56 +10,124 @@ import matplotlib.pyplot as plt
 
 from params import *
 from utility import *
+from mfcc import *
 
-meanMFCC = 0
-stdMFCC = 0
-meanWindow = 0
-stdWindow = 0
+meanTransformed = 0
+stdTransformed = 0
+meanOrig = 0
+stdOrig = 0
 
-def computeMeanVariance(mfccs, windows):
-    global meanMFCC
-    global stdMFCC
-    global meanWindow
-    global stdWindow
+def transformWindows(windows):
+    #windows = dct(windows, type = 2, norm = 'ortho')
+    return windows
+    #return getMFCCsForWindows(windows)
+    '''
+    numWindows = windows.shape[0]
 
-    meanMFCC = np.mean(mfccs, axis=0)
-    stdMFCC = np.std(mfccs, axis=0)
-    meanWindow = np.mean(windows, axis=0)
-    stdWindow = np.std(windows, axis=0)
+    transformedWindows = np.zeros((numWindows, 160))
 
-    print "mean MFCC: ", meanMFCC
-    print "std MFCC: ", stdMFCC
-    print "mean window: ", meanWindow
-    print "std window: ", stdWindow
+    i = 0
+    for window in windows:
+        # preemphasize signal
+        preemphasized = np.copy(window)
+        for i in xrange(1, len(window)):
+            preemphasized[i] = window[i] - 0.9 * window[i - 1]
+        transformed = dct(preemphasized, type = 2, norm = 'ortho')
+        #transformed = np.dot(transformed, FILTERBANK)
+        #transformed = fft(window)
+        #transformed = np.real(transformed)
+        #transformed = np.concatenate([np.real(transformed), np.imag(transformed)], axis=0)
+        transformed = np.reshape(np.array(transformed), (1, 160))
 
-def preprocessMFCCs(mfccs):
-    return mfccs
+        transformedWindows[i, :] = transformed
 
-def preprocessWindows(windows):
-    windows = dct(windows, type = 2, norm = 'ortho')
+        i += 1
+        if (VERBOSE):
+            if (i % 500 == 0):
+                print i, "/", numWindows
+    return transformedWindows
+    #'''
+
+
+def computeMeanVariance(transformed, orig):
+    global meanTransformed
+    global stdTransformed
+    global meanOrig
+    global stdOrig
+
+    meanTransformed = np.mean(transformed, axis=0)
+    stdTransformed = np.std(transformed, axis=0)
+    meanOrig = np.mean(orig, axis=0)
+    stdOrig = np.std(orig, axis=0)
+
+    # replace zeros in STDs with very very small floats
+    stdTransformed = np.where(stdTransformed == 0, np.finfo(float).eps, stdTransformed)
+    stdOrig = np.where(stdOrig == 0, np.finfo(float).eps, stdOrig)
+
+    #print "mean MFCC: ", meanTransformed
+    #print "std MFCC: ", stdTransformed
+    #print "mean window: ", meanOrig
+    #print "std window: ", stdOrig
+
+
+
+def preprocessTransformedWindows(windows):
     return windows
 
-def normalizeMFCCs(mfccs):
-    mfccs = (mfccs - meanMFCC) / stdMFCC
-    return mfccs
+def preprocessOrigWindows(windows):
+    if (PREPROC_METHOD == 'fft'):
+        windows = fft(windows)
+        windows = np.concatenate([np.real(windows), np.imag(windows)], axis=1)
+    elif (PREPROC_METHOD == 'dct'):
+        windows = dct(windows, type = 2, norm = 'ortho')  
 
-def normalizeWindows(windows):
-    windows = (windows - meanWindow) / stdWindow
+    return windows
+
+def normalizeTransformedWindows(windows):
+    windows = (windows - meanTransformed) / stdTransformed
+    windows = windows / 3.0
+    windows = np.tanh(windows)
+    return windows
+
+def normalizeOrigWindows(windows):
+    windows = (windows - meanOrig) / stdOrig
+    windows = windows / 3.0
+    windows = np.tanh(windows)
     return windows
 
 
 
-def unpreprocessMFCCs(mfccs):
-    return mfccs
-
-def unpreprocessWindows(windows):
-    windows = idct(windows, type = 2, norm = 'ortho')
+def unpreprocessTransformedWindows(windows):
     return windows
 
-def denormalizeMFCCs(mfccs):
-    mfccs = (mfccs * stdMFCC) + meanMFCC
-    return mfccs
-
-def denormalizeWindows(windows):
-    windows = (windows * stdWindow) + meanWindow
+def unpreprocessOrigWindows(windows):
+    if (PREPROC_METHOD == 'fft'):
+        real = windows[:, :WINDOW_SIZE]
+        imag = windows[:, WINDOW_SIZE:]
+    
+        windows = real + (imag * 1j)
+        windows = ifft(windows)
+    elif (PREPROC_METHOD == 'dct'):
+        windows = idct(windows, type = 2, norm = 'ortho')   
+ 
     return windows
+
+def denormalizeTransformedWindows(windows):
+    windows = np.arctanh(windows)
+    windows = windows * 3.0
+    windows = (windows * stdTransformed) + meanTransformed
+    return windows
+
+def denormalizeOrigWindows(windows):
+    windows = np.arctanh(windows)
+    windows = windows * 3.0
+    windows = (windows * stdOrig) + meanOrig
+    return windows
+
+
+
+
+
+
+
+

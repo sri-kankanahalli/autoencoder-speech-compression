@@ -6,7 +6,7 @@ WINDOW_SIZE = STEP_SIZE * 2
 WINDOW_FUNC = sig.hann(WINDOW_SIZE)
 
 # directory that contains .wav files to process
-DATA_DIR = "./entire/"
+DATA_DIR = "./noizeus_clean/"
 
 # randomly shuffle data before partitioning into training/validation?
 RANDOM_SHUFFLE = False
@@ -15,7 +15,10 @@ RANDOM_SHUFFLE = False
 SAMPLE_RATE = 8000
 
 # number of MFCC coefficients
-NUM_MFCC_COEFFS = 25
+NUM_MFCC_COEFFS = 40
 
 # debug messages?
 VERBOSE = True
+
+# preprocessing method -- FFT or DCT?
+PREPROC_METHOD = 'raw'

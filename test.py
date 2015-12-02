@@ -29,101 +29,124 @@ from preprocessing import *
 # read in WAV files
 print "Reading in .wav files..."
 fileList = filesInDir(DATA_DIR)
-allWindows = []
+origWindows = []
 for filepath in fileList:
     [rate, data] = sciwav.read(filepath)
     windows = extractWindows(data)
 
-    if (allWindows == []):
-        allWindows = windows
+    if (origWindows == []):
+        origWindows = windows
     else:
-        allWindows = np.append(allWindows, windows, axis=0)
+        origWindows = np.append(origWindows, windows, axis=0)
 
     #print filepath, ": ", windows.shape
 
 # randomly shuffle data
 if (RANDOM_SHUFFLE):
-    allWindows = np.random.permutation(allWindows)
-print "All windows shape: ", allWindows.shape
+    origWindows = np.random.permutation(origWindows)
+print "Original windows shape: ", origWindows.shape
 
 # get MFCCs for windows
-print "Calculating MFCCs..."
-allMFCCs = getMFCCsForWindows(allWindows)
+print "Calculating window transformation..."
+transformedWindows = transformWindows(origWindows)
 
 # convert to float
-allWindows = allWindows.astype(np.float32)
-allMFCCs   = allMFCCs.astype(np.float32)
+origWindows = origWindows.astype(np.float32)
+transformedWindows = transformedWindows.astype(np.float32)
 
 
 
 
 
 # preprocessing
-allMFCCs = preprocessMFCCs(allMFCCs)
-allWindows = preprocessWindows(allWindows)
+transformedWindows = preprocessTransformedWindows(transformedWindows)
+origWindows = preprocessOrigWindows(origWindows)
 
-computeMeanVariance(allMFCCs, allWindows)
+# compute mean and variance, then normalize by them
+computeMeanVariance(transformedWindows, origWindows)
+transformedWindows = normalizeTransformedWindows(transformedWindows)
+origWindows = normalizeOrigWindows(origWindows)
 
-allMFCCs = normalizeMFCCs(allMFCCs)
-allWindows = normalizeWindows(allWindows)
+print np.mean(np.abs(transformedWindows), axis=None)
+print np.std(np.abs(transformedWindows), axis=None)
+print np.mean(np.abs(origWindows), axis=None)
+print np.std(np.abs(origWindows), axis=None)
 
-# training/testing split
-split = round(allMFCCs.shape[0] * 0.9)
+# 80/20 training/testing split
+split = round(transformedWindows.shape[0] * 0.8)
 
-X_train = (allMFCCs[:split, :])
-Y_train = (allWindows[:split, :])
-X_test  = (allMFCCs[split:, :])
-Y_test  = (allWindows[split:, :])
+X_train = (transformedWindows[:split, :])
+Y_train = (origWindows[:split, :])
+X_test  = (transformedWindows[split:, :])
+Y_test  = (origWindows[split:, :])
 
 autoencoder = Sequential()
-autoencoder.add(GaussianDropout(input_shape = (NUM_MFCC_COEFFS,), p = 0.05))
-autoencoder.add(Dense(output_dim = 1024, init = "glorot_uniform", activation = "relu"))
-autoencoder.add(Dense(output_dim = 512, init = "glorot_uniform", activation = "relu"))
-autoencoder.add(Dense(output_dim = 300, init = "glorot_uniform", activation = "relu"))
-autoencoder.add(Dense(output_dim = 240, init = "glorot_uniform", activation = "relu"))
+
+'''
+autoencoder.add(Dense(input_shape = (25,), output_dim = 100, init = "glorot_normal"))
+autoencoder.add(Dense(output_dim = 160, init = "glorot_normal", activation = "tanh"))
+autoencoder.add(Dense(input_shape = (160,), output_dim = 25600, init = "glorot_normal"))
+autoencoder.add(Dense(output_dim = 160, init = "glorot_normal"))
+#'''
+
+'''
+autoencoder.add(Dense(input_shape = (160,), output_dim = 80, init = "glorot_normal",
+                       activation='tanh'))
+autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='tanh'))
+autoencoder.add(Dense(output_dim = 40, init = "glorot_normal"))
+autoencoder.add(GaussianDropout(0.1))
+autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='tanh'))
+autoencoder.add(Dense(output_dim = 80, init = "glorot_normal", activation='tanh'))
+autoencoder.add(Dense(output_dim = 160, init = "glorot_normal", activation="tanh"))
+#'''
+
+# interesting observation: autoencoder going from raw => raw or dct => raw resembles
+#     a bandpass filter
+#'''
+autoencoder.add(Reshape(input_shape = (160,), dims = (1, 160, 1)))
+autoencoder.add(Convolution2D(input_shape = (1, 160, 1), nb_filter = 64, nb_row = 16, nb_col = 1, init = "glorot_uniform",
+                              border_mode = "same"))
+autoencoder.add(Flatten(input_shape=(64, 160, 1)))
+autoencoder.add(Dense(output_dim = 1024, init = "glorot_uniform", activation = "tanh"))
+autoencoder.add(Dense(output_dim = 256, init = "glorot_uniform"))
+autoencoder.add(Dense(output_dim = 40, init = "glorot_uniform", activation = "tanh"))
 autoencoder.add(Dense(output_dim = 160, init = "glorot_uniform"))
+autoencoder.add(Reshape(input_shape = (160,), dims = (1, 160, 1)))
+autoencoder.add(Convolution2D(input_shape = (1, 160, 1), nb_filter = 1, nb_row = 64, nb_col = 1, init = "glorot_uniform",
+                              activation = "tanh", border_mode = "same"))
+autoencoder.add(Reshape(input_shape = (1, 160, 1), dims = (160,)))
+#'''
 
 autoencoder.compile(loss = 'root_mean_squared_error', optimizer = RMSprop())
 
-autoencoder.fit(X_train, Y_train, nb_epoch = 500, batch_size = 64,
+autoencoder.fit(X_train, Y_train, nb_epoch = 100, batch_size = 64,
 		verbose = 1, validation_data = [X_test, Y_test], show_accuracy = False)
 
 
-[rate, data] = sciwav.read("sp01.wav")
-windows = extractWindows(data)
+def autoencoderTest(waveFilename, desiredFilename, reconstructionFilename):
+    [rate, data] = sciwav.read(waveFilename)
+    windows = extractWindows(data)
 
-# first, write desired reconstruction
-desiredReconstruction = reconstructFromWindows(windows)
-sciwav.write("desired.wav", rate, desiredReconstruction)
+    # first, write desired reconstruction
+    desiredReconstruction = reconstructFromWindows(windows)
+    sciwav.write(desiredFilename, rate, desiredReconstruction)
     
-# then, run NN on MFCCs
-mfccs = getMFCCsForWindows(windows)
-mfccs = preprocessMFCCs(mfccs)
-mfccs = normalizeMFCCs(mfccs)
+    # then, run NN on transformed windows
+    transformed = transformWindows(windows)
+    transformed = preprocessTransformedWindows(transformed)
+    transformed = normalizeTransformedWindows(transformed)
 
-predicted = autoencoder.predict(mfccs, batch_size = 64, verbose = 1)
-predicted = denormalizeWindows(predicted)
-predicted = unpreprocessWindows(predicted)
+    predicted = autoencoder.predict(transformed, batch_size = 64, verbose = 1)
+    predicted = denormalizeOrigWindows(predicted)
+    predicted = unpreprocessOrigWindows(predicted)
 
-nnReconstruction = reconstructFromWindows(predicted)
-sciwav.write("nnOutput.wav", rate, nnReconstruction)
+    nnReconstruction = reconstructFromWindows(predicted)
+    sciwav.write(reconstructionFilename, rate, nnReconstruction)
+
+autoencoderTest("./sp01.wav", "sp01desired.wav", "sp01output.wav")
+autoencoderTest("./fiveYears.wav", "fydesired.wav", "fyoutput.wav")
+autoencoderTest("./sp19.wav", "sp19desired.wav", "sp19output.wav")
 
 
 
-'''
-[rate, data] = sciwav.read("fiveYears.wav")
-print data.shape
 
-windows = extractWindows(data)
-print windows.shape
-
-reconstruction = reconstructFromWindows(windows)
-print reconstruction.shape
-
-sciwav.write("out.wav", rate, reconstruction)
-
-r = reconstruction[:data.shape[0]]
-print "mse: ", mse(r, data)
-print "avg err: ", avgErr(r, data)
-
-'''

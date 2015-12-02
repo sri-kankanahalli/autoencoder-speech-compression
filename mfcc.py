@@ -33,14 +33,13 @@ def melFilterBank(numCoeffs):
     # create (numCoeffs + 2) points evenly spaced between minMel and maxMel
     melCenterFilters = melRange * (maxMel - minMel) / (numCoeffs + 1) + minMel
 
-    # mel domain => frequency domain
+    
     for i in xrange(numCoeffs + 2):
+        # mel domain => frequency domain
         melCenterFilters[i] = melToFreq(melCenterFilters[i])
 
-    # frequency domain => FFT bins
-    for i in xrange(numCoeffs + 2):
-        melCenterFilters[i] = math.floor(numFFTBins * melCenterFilters[i] / maxHz)
-    print melCenterFilters
+        # frequency domain => FFT bins
+        melCenterFilters[i] = math.floor(numFFTBins * melCenterFilters[i] / maxHz)       
 
     # create matrix of filters (one row is one filter)
     filterMat = np.zeros((numCoeffs, numFFTBins))
@@ -59,6 +58,9 @@ def melFilterBank(numCoeffs):
             filter[j] = 1 - ((float(j) - midRange) / (endRange - midRange))
         
         filterMat[i - 1] = filter
+        #plt.plot(filter)
+    print melCenterFilters
+    #plt.show()
 
     # return filterbank as matrix
     return filterMat
@@ -69,6 +71,11 @@ FILTERBANK = melFilterBank(NUM_MFCC_COEFFS).transpose()
 
 # compute MFCC for single window
 def mfcc(signal):
+    # preemphasize signal
+    #preemphasizedSignal = np.copy(signal)
+    #for i in xrange(1, len(signal)):
+    #    preemphasizedSignal[i] = signal[i] - 0.9 * signal[i - 1]
+
     complexSpectrum = fft(signal)
     powerSpectrum = abs(complexSpectrum) ** 2
     filteredSpectrum = np.dot(powerSpectrum, FILTERBANK)
