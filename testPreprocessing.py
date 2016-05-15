@@ -16,20 +16,21 @@ from utility import *
 from mfcc import *
 from preprocessing import *
 
-[rate, data] = sciwav.read("sp01.wav")
+[rate, data] = sciwav.read("fiveYears.wav")
 windows = extractWindows(data)
-
-transformed = transformWindows(windows)
-computeMeanVariance(transformed, windows)
 
 print "before preprocessing: ", windows.shape
 
-windows = preprocessOrigWindows(windows)
-windows = normalizeOrigWindows(windows)
+#computeSWTDecomp(windows)
+#exit()
+
+windows = processWindows(windows)
+computeMeanVariance(windows)
+windows = normalizeWindows(windows)
 print "after preprocessing: ", windows.shape
 
-windows = denormalizeOrigWindows(windows)
-windows = unpreprocessOrigWindows(windows)
+windows = denormalizeWindows(windows)
+windows = deprocessWindows(windows)
 print "after un-preprocessing: ", windows.shape
 
 reconstruction = reconstructFromWindows(windows)

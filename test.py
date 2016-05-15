@@ -19,6 +19,7 @@ from keras.layers.convolutional import *
 from keras.regularizers import *
 from keras.layers.advanced_activations import *
 from keras.layers.normalization import *
+from keras.constraints import *
 
 from windowingFunctions import *
 from params import *
@@ -29,65 +30,89 @@ from preprocessing import *
 # read in WAV files
 print "Reading in .wav files..."
 fileList = filesInDir(DATA_DIR)
-origWindows = []
+rawWindows = []
 for filepath in fileList:
     [rate, data] = sciwav.read(filepath)
     windows = extractWindows(data)
 
-    if (origWindows == []):
-        origWindows = windows
+    if (rawWindows == []):
+        rawWindows = windows
     else:
-        origWindows = np.append(origWindows, windows, axis=0)
+        rawWindows = np.append(rawWindows, windows, axis=0)
 
     #print filepath, ": ", windows.shape
 
 # randomly shuffle data
 if (RANDOM_SHUFFLE):
-    origWindows = np.random.permutation(origWindows)
-print "Original windows shape: ", origWindows.shape
+    rawWindows = np.random.permutation(rawWindows)
 
-# get MFCCs for windows
-print "Calculating window transformation..."
-transformedWindows = transformWindows(origWindows)
+print "Raw windows shape: ", rawWindows.shape
 
-# convert to float
-origWindows = origWindows.astype(np.float32)
-transformedWindows = transformedWindows.astype(np.float32)
-
-
-
-
-
-# preprocessing
-transformedWindows = preprocessTransformedWindows(transformedWindows)
-origWindows = preprocessOrigWindows(origWindows)
+# transform data and convert to float
+print "Processing windows..."
+processedWindows = processWindows(rawWindows)
+processedWindows = processedWindows.astype(np.float32)
 
 # compute mean and variance, then normalize by them
-computeMeanVariance(transformedWindows, origWindows)
-transformedWindows = normalizeTransformedWindows(transformedWindows)
-origWindows = normalizeOrigWindows(origWindows)
+computeMeanVariance(processedWindows)
+processedWindows = normalizeWindows(processedWindows)
 
-print np.mean(np.abs(transformedWindows), axis=None)
-print np.std(np.abs(transformedWindows), axis=None)
-print np.mean(np.abs(origWindows), axis=None)
-print np.std(np.abs(origWindows), axis=None)
+print np.mean(np.abs(processedWindows), axis=None)
+print np.std(np.abs(processedWindows), axis=None)
+
 
 # 80/20 training/testing split
-split = round(transformedWindows.shape[0] * 0.8)
+split = round(processedWindows.shape[0] * 0.8)
 
-X_train = (transformedWindows[:split, :])
-Y_train = (origWindows[:split, :])
-X_test  = (transformedWindows[split:, :])
-Y_test  = (origWindows[split:, :])
+_train = (processedWindows[:split, :])
+_test  = (processedWindows[split:, :])
 
 autoencoder = Sequential()
 
-'''
-autoencoder.add(Dense(input_shape = (25,), output_dim = 100, init = "glorot_normal"))
-autoencoder.add(Dense(output_dim = 160, init = "glorot_normal", activation = "tanh"))
-autoencoder.add(Dense(input_shape = (160,), output_dim = 25600, init = "glorot_normal"))
-autoencoder.add(Dense(output_dim = 160, init = "glorot_normal"))
 #'''
+autoencoder.add(Reshape(input_shape = (120,), dims=(120,)))
+autoencoder.add(MaxoutDense(output_dim = 80, init = "glorot_normal", nb_feature = 15,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 60, init = "glorot_normal", nb_feature = 15,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 32, init = "glorot_normal", nb_feature = 10,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 10, init = "glorot_normal", nb_feature = 5,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 32, init = "glorot_normal", nb_feature = 5,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 60, init = "glorot_normal", nb_feature = 10,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 80, init = "glorot_normal", nb_feature = 15,
+                            W_constraint = maxnorm(1)))
+autoencoder.add(MaxoutDense(output_dim = 120, init = "glorot_normal", nb_feature = 15))
+#'''
+
+'''
+autoencoder.add(Reshape(input_shape = (120,), dims=(120,)))
+autoencoder.add(Dense(output_dim = 60, init = "glorot_normal", #nb_feature = 20,
+                            W_constraint = maxnorm(2)))
+autoencoder.add(PReLU())
+#autoencoder.add(Activation("tanh"))
+autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", #nb_feature = 15,
+                            W_constraint = maxnorm(2)))
+autoencoder.add(PReLU())
+#autoencoder.add(Activation("tanh"))
+autoencoder.add(Dense(output_dim = 8, init = "glorot_normal", #nb_feature = 5,
+                            W_constraint = maxnorm(2)))
+autoencoder.add(PReLU())
+#autoencoder.add(Activation("tanh"))
+autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", #nb_feature = 15,
+                            W_constraint = maxnorm(2)))
+autoencoder.add(PReLU())
+#autoencoder.add(Activation("tanh"))
+autoencoder.add(Dense(output_dim = 60, init = "glorot_normal", #nb_feature = 20,
+                            W_constraint = maxnorm(2)))
+autoencoder.add(PReLU())
+#autoencoder.add(Activation("tanh"))
+autoencoder.add(Dense(output_dim = 120, init = "glorot_normal", #nb_feature = 25,
+                            W_constraint = maxnorm(2)))
+'''
 
 '''
 autoencoder.add(Dense(input_shape = (160,), output_dim = 80, init = "glorot_normal",
@@ -102,50 +127,67 @@ autoencoder.add(Dense(output_dim = 160, init = "glorot_normal", activation="tanh
 
 # interesting observation: autoencoder going from raw => raw or dct => raw resembles
 #     a bandpass filter
-#'''
-autoencoder.add(Reshape(input_shape = (160,), dims = (1, 160, 1)))
-autoencoder.add(Convolution2D(input_shape = (1, 160, 1), nb_filter = 64, nb_row = 16, nb_col = 1, init = "glorot_uniform",
+'''
+autoencoder.add(Reshape(input_shape = (40,), dims = (1, 40, 1)))
+autoencoder.add(Convolution2D(input_shape = (1, 40, 1), nb_filter = 32, nb_row = 10, nb_col = 1, init = "glorot_uniform",
                               border_mode = "same"))
-autoencoder.add(Flatten(input_shape=(64, 160, 1)))
-autoencoder.add(Dense(output_dim = 1024, init = "glorot_uniform", activation = "tanh"))
+autoencoder.add(PReLU())
+autoencoder.add(Flatten(input_shape=(32, 40, 1)))
+autoencoder.add(Dense(output_dim = 2048, init = "glorot_uniform"))
+autoencoder.add(PReLU())
 autoencoder.add(Dense(output_dim = 256, init = "glorot_uniform"))
+autoencoder.add(PReLU())
+autoencoder.add(Dense(output_dim = 15, init = "glorot_uniform"))
+autoencoder.add(PReLU())
+autoencoder.add(Dense(output_dim = 40, init = "glorot_uniform"))
+autoencoder.add(PReLU())
 autoencoder.add(Dense(output_dim = 40, init = "glorot_uniform", activation = "tanh"))
-autoencoder.add(Dense(output_dim = 160, init = "glorot_uniform"))
-autoencoder.add(Reshape(input_shape = (160,), dims = (1, 160, 1)))
-autoencoder.add(Convolution2D(input_shape = (1, 160, 1), nb_filter = 1, nb_row = 64, nb_col = 1, init = "glorot_uniform",
-                              activation = "tanh", border_mode = "same"))
-autoencoder.add(Reshape(input_shape = (1, 160, 1), dims = (160,)))
+#autoencoder.add(Reshape(input_shape = (40,), dims = (1, 40, 1)))
+#autoencoder.add(Convolution2D(input_shape = (1, 40, 1), nb_filter = 1, nb_row = 20, nb_col = 1, init = "glorot_uniform",
+#                              border_mode = "same"))
+#autoencoder.add(Reshape(input_shape = (1, 40, 1), dims = (40,)))
 #'''
 
-autoencoder.compile(loss = 'root_mean_squared_error', optimizer = RMSprop())
+autoencoder.compile(loss = 'root_mean_squared_error', optimizer = Adam())
 
-autoencoder.fit(X_train, Y_train, nb_epoch = 100, batch_size = 64,
-		verbose = 1, validation_data = [X_test, Y_test], show_accuracy = False)
+autoencoder.fit(_train, _train, nb_epoch = NUM_EPOCHS, batch_size = BATCH_SIZE,
+		verbose = 1, validation_data = [_test, _test], show_accuracy = False)
 
 
-def autoencoderTest(waveFilename, desiredFilename, reconstructionFilename):
+def autoencoderTest(waveFilename, prefix, replacement=False):
     [rate, data] = sciwav.read(waveFilename)
     windows = extractWindows(data)
 
     # first, write desired reconstruction
-    desiredReconstruction = reconstructFromWindows(windows)
-    sciwav.write(desiredFilename, rate, desiredReconstruction)
+    desiredWindows = processWindows(windows)
+    desiredWindows = normalizeWindows(desiredWindows)
+    desiredWindows = denormalizeWindows(desiredWindows)
+    desiredWindows = deprocessWindows(desiredWindows)
+    desiredReconstruction = reconstructFromWindows(desiredWindows)
+    sciwav.write(prefix + "desired.wav", rate, desiredReconstruction)
     
     # then, run NN on transformed windows
-    transformed = transformWindows(windows)
-    transformed = preprocessTransformedWindows(transformed)
-    transformed = normalizeTransformedWindows(transformed)
+    transformed = processWindows(windows)
+    transformed = normalizeWindows(transformed)
 
-    predicted = autoencoder.predict(transformed, batch_size = 64, verbose = 1)
-    predicted = denormalizeOrigWindows(predicted)
-    predicted = unpreprocessOrigWindows(predicted)
+    autoencOutput = autoencoder.predict(transformed, batch_size = 64, verbose = 1)
+    predicted = denormalizeWindows(autoencOutput)
+    predicted = deprocessWindows(predicted)
 
     nnReconstruction = reconstructFromWindows(predicted)
-    sciwav.write(reconstructionFilename, rate, nnReconstruction)
+    sciwav.write(prefix + "output.wav", rate, nnReconstruction)
 
-autoencoderTest("./sp01.wav", "sp01desired.wav", "sp01output.wav")
-autoencoderTest("./fiveYears.wav", "fydesired.wav", "fyoutput.wav")
-autoencoderTest("./sp19.wav", "sp19desired.wav", "sp19output.wav")
+    if replacement == True:
+        nnReplaced = replaceInWindows(windows, autoencOutput)
+        nnReplaced = reconstructFromWindows(nnReplaced)
+        sciwav.write(prefix + "replaced.wav", rate, nnReplaced)
+
+    print waveFilename, " mse: ", mse(nnReconstruction, desiredReconstruction)
+    print waveFilename, " avg err: ", avgErr(nnReconstruction, desiredReconstruction)
+
+autoencoderTest("./sp01.wav", "sp01", True)
+autoencoderTest("./fiveYears.wav", "fy", True)
+autoencoderTest("./sp19.wav", "sp19", True)
 
 
 

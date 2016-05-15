@@ -40,28 +40,24 @@ def reconstructFromWindows(windows):
         if (i == 0):
             reconstruction = r
         else:
-            currLastWindow = reconstruction[-STEP_SIZE:]
-            thisLastWindow = r[:STEP_SIZE]
-            nextWindow = r[STEP_SIZE:]
-            
-            # overlap redundant parts of window. here's a visual
-            #      window 1: A   B1
-            #      window 2:     B2   C
-            #      merged:   A   B~   C
-            firstHalf = np.copy(currLastWindow)
-            for j in xrange(0, STEP_SIZE):
-                # use windowing function
-                thisMult = WINDOW_FUNC[j]
-                lastMult = WINDOW_FUNC[j + STEP_SIZE]
+            overlapLastWindow = reconstruction[-OVERLAP_SIZE:]
+            overlapThisWindow = r[:OVERLAP_SIZE]
+            unmodifiedPart = r[OVERLAP_SIZE:]
 
-                #thisMult = float(j) / STEP_SIZE
+            overlappedPart = np.copy(overlapLastWindow)
+            for j in xrange(0, OVERLAP_SIZE):
+                # use windowing function
+                thisMult = OVERLAP_FUNC[j]
+                lastMult = OVERLAP_FUNC[j + OVERLAP_SIZE]
+
+                #thisMult = float(j) / OVERLAP_SIZE
                 #lastMult = 1 - thisMult
-                
-                firstHalf[j] = thisLastWindow[j] * thisMult + \
-                               currLastWindow[j] * lastMult
-            
-            reconstruction[-STEP_SIZE:] = firstHalf
-            reconstruction = np.concatenate([reconstruction, nextWindow])
+
+                overlappedPart[j] = overlapThisWindow[j] * thisMult + \
+                                    overlapLastWindow[j] * lastMult
+
+            reconstruction[-OVERLAP_SIZE:] = overlappedPart
+            reconstruction = np.concatenate([reconstruction, unmodifiedPart])
         
     reconstruction =  reconstruction.astype(np.int16)
     return reconstruction

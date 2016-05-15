@@ -1,0 +1,151 @@
+500 iters on noizeus_clean:
+    coif1 wavelet, RMSE
+        ./sp01.wav  mse:  1884.87429329
+        ./sp01.wav  avg err:  126.756360424
+
+        ./fiveYears.wav  mse:  1314.69673814
+        ./fiveYears.wav  avg err:  825.370004562
+
+        ./sp19.wav  mse:  1415.51030784
+        ./sp19.wav  avg err:  219.802938433
+    coif1 wavelet, MSE
+        ./sp01.wav  mse:  2039.93083039
+        ./sp01.wav  avg err:  134.416696113
+           
+        ./fiveYears.wav  mse:  1313.07420164
+        ./fiveYears.wav  avg err:  837.508097628
+            
+        ./sp19.wav  mse:  1426.24328358
+        ./sp19.wav  avg err:  244.400466418
+    coif1 wavelet, RMSE, small1 network (40 => 35 => 32 => 30 => 16)
+        ./sp01.wav  mse:  1824.47866608
+        ./sp01.wav  avg err:  114.552694346
+
+        ./fiveYears.wav  mse:  1814.02084854
+        ./fiveYears.wav  avg err:  691.702782847
+
+        ./sp19.wav  mse:  1493.76366604
+        ./sp19.wav  avg err:  182.033162313
+    coif2 wavelet, RMSE, small1 network
+        ./sp01.wav  mse:  1475.25878975
+        ./sp01.wav  avg err:  121.386704947
+
+        ./fiveYears.wav  mse:  1692.62431569
+        ./fiveYears.wav  avg err:  692.154653285
+
+        ./sp19.wav  mse:  1386.39785448
+        ./sp19.wav  avg err:  153.420802239
+    coif3 wavelet, RMSE, small1 network
+        ./sp01.wav  mse:  1497.6264576
+        ./sp01.wav  avg err:  125.049514134
+     
+        ./fiveYears.wav  mse:  1531.04390967
+        ./fiveYears.wav  avg err:  718.822422445
+  
+        ./sp19.wav  mse:  1243.43768657
+        ./sp19.wav  avg err:  167.712966418
+    (OF COIFLETS, coif2 seems to be the best choice)
+
+    bior1.3 wavelet ("cpd")
+        ./sp01.wav  mse:  1570.83931095
+        ./sp01.wav  avg err:  151.297526502
+   
+        ./fiveYears.wav  mse:  709.16665146
+        ./fiveYears.wav  avg err:  981.233850365
+   
+        ./sp19.wav  mse:  1872.55396455
+        ./sp19.wav  avg err:  294.127378731
+    bior1.3 wavelet ("per")
+        ./sp01.wav  mse:  1853.51024735
+        ./sp01.wav  avg err:  146.129416961
+   
+        ./fiveYears.wav  mse:  810.948494526
+        ./fiveYears.wav  avg err:  934.19689781
+ 
+        ./sp19.wav  mse:  1577.08666045
+        ./sp19.wav  avg err:  265.279011194
+
+
+
+
+
+100 iters on noizeus_clean:
+    divide by 3, haar wavelet
+        ./sp01.wav  mse:  1612.31722615
+        ./sp01.wav  avg err:  165.717756184
+
+        ./fiveYears.wav  mse:  1088.77301551
+        ./fiveYears.wav  avg err:  981.423289234
+     
+        ./sp19.wav  mse:  1699.94183769
+        ./sp19.wav  avg err:  270.237453358
+
+    divide by 3, db4 wavelet (100 iters on noizeus_clean)
+        ./sp01.wav  mse:  1719.88948763
+        ./sp01.wav  avg err:  135.149734982
+           
+        ./fiveYears.wav  mse:  887.354470803
+        ./fiveYears.wav  avg err:  850.616560219
+            
+        ./sp19.wav  mse:  1452.78978545
+        ./sp19.wav  avg err:  237.427005597
+
+    divide by 3, dmey wavelet
+        ./sp01.wav  mse:  1718.61881625
+        ./sp01.wav  avg err:  150.005565371
+            
+        ./fiveYears.wav  mse:  969.326596715
+        ./fiveYears.wav  avg err:  880.969708029
+             
+        ./sp19.wav  mse:  1425.79188433
+        ./sp19.wav  avg err:  238.289645522
+    
+    divide by 3, coif1 wavelet
+        ./sp01.wav  mse:  1856.10658127
+        ./sp01.wav  avg err:  121.795185512
+ 
+        ./fiveYears.wav  mse:  1546.43743157
+        ./fiveYears.wav  avg err:  792.693453467
+
+        ./sp19.wav  mse:  1480.48544776
+        ./sp19.wav  avg err:  221.868563433
+
+    no division, coif1 wavelet  
+        ./sp01.wav  mse:  1693.16117491
+        ./sp01.wav  avg err:  126.32495583
+
+        ./fiveYears.wav  mse:  1442.86838504
+        ./fiveYears.wav  avg err:  817.047354015
+
+        ./sp19.wav  mse:  1466.10247201
+        ./sp19.wav  avg err:  230.338479478
+
+    pure tanh, coif1 wavelet
+        ./sp01.wav  mse:  1891.0334364
+        ./sp01.wav  avg err:  120.748189046
+
+        ./fiveYears.wav  mse:  1511.71847628
+        ./fiveYears.wav  avg err:  818.863366788
+
+        ./sp19.wav  mse:  1618.02378731
+        ./sp19.wav  avg err:  248.550279851
+
+    divide by 3 then tanh, coif1 wavelet  
+        ./sp01.wav  mse:  1900.34421378
+        ./sp01.wav  avg err:  122.526899293
+    
+        ./fiveYears.wav  mse:  1309.80732208
+        ./fiveYears.wav  avg err:  804.270095803
+  
+        ./sp19.wav  mse:  1455.46651119
+        ./sp19.wav  avg err:  235.818283582
+
+
+
+
+
+
+
+
+
+

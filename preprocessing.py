@@ -7,123 +7,72 @@ import operator
 import math
 import scipy.io.wavfile as sciwav
 import matplotlib.pyplot as plt
+import pywt
+from wavelets import *
 
 from params import *
 from utility import *
 from mfcc import *
 
-meanTransformed = 0
-stdTransformed = 0
-meanOrig = 0
-stdOrig = 0
-
-def transformWindows(windows):
-    #windows = dct(windows, type = 2, norm = 'ortho')
-    return windows
-    #return getMFCCsForWindows(windows)
-    '''
-    numWindows = windows.shape[0]
-
-    transformedWindows = np.zeros((numWindows, 160))
-
-    i = 0
-    for window in windows:
-        # preemphasize signal
-        preemphasized = np.copy(window)
-        for i in xrange(1, len(window)):
-            preemphasized[i] = window[i] - 0.9 * window[i - 1]
-        transformed = dct(preemphasized, type = 2, norm = 'ortho')
-        #transformed = np.dot(transformed, FILTERBANK)
-        #transformed = fft(window)
-        #transformed = np.real(transformed)
-        #transformed = np.concatenate([np.real(transformed), np.imag(transformed)], axis=0)
-        transformed = np.reshape(np.array(transformed), (1, 160))
-
-        transformedWindows[i, :] = transformed
-
-        i += 1
-        if (VERBOSE):
-            if (i % 500 == 0):
-                print i, "/", numWindows
-    return transformedWindows
-    #'''
+meanWin = 0
+stdWin = 0
 
 
-def computeMeanVariance(transformed, orig):
-    global meanTransformed
-    global stdTransformed
-    global meanOrig
-    global stdOrig
+def computeMeanVariance(windows):
+    global meanWin
+    global stdWin
 
-    meanTransformed = np.mean(transformed, axis=0)
-    stdTransformed = np.std(transformed, axis=0)
-    meanOrig = np.mean(orig, axis=0)
-    stdOrig = np.std(orig, axis=0)
+    meanWin = np.mean(windows, axis=0)
+    stdWin = np.std(windows, axis=0)
 
     # replace zeros in STDs with very very small floats
-    stdTransformed = np.where(stdTransformed == 0, np.finfo(float).eps, stdTransformed)
-    stdOrig = np.where(stdOrig == 0, np.finfo(float).eps, stdOrig)
-
-    #print "mean MFCC: ", meanTransformed
-    #print "std MFCC: ", stdTransformed
-    #print "mean window: ", meanOrig
-    #print "std window: ", stdOrig
+    stdWin = np.where(stdWin == 0, np.finfo(float).eps, stdWin)
 
 
+def processWindows(windows):
+    #dec = computeWaveletDecomp(windows)
+    #dec = dec[:, COEFF_SPLITS[1]:COEFF_SPLITS[2]]
 
-def preprocessTransformedWindows(windows):
-    return windows
+    dec = computeSWTDecomp(windows)
+    dec = dec[:, :WINDOW_SIZE]
+    return dec
 
-def preprocessOrigWindows(windows):
-    if (PREPROC_METHOD == 'fft'):
-        windows = fft(windows)
-        windows = np.concatenate([np.real(windows), np.imag(windows)], axis=1)
-    elif (PREPROC_METHOD == 'dct'):
-        windows = dct(windows, type = 2, norm = 'ortho')  
-
-    return windows
-
-def normalizeTransformedWindows(windows):
-    windows = (windows - meanTransformed) / stdTransformed
-    windows = windows / 3.0
-    windows = np.tanh(windows)
-    return windows
-
-def normalizeOrigWindows(windows):
-    windows = (windows - meanOrig) / stdOrig
-    windows = windows / 3.0
-    windows = np.tanh(windows)
+def normalizeWindows(windows):
+    windows = (windows - meanWin) / stdWin
+    #windows = windows / 3.0
+    #windows = np.tanh(windows)
     return windows
 
 
 
-def unpreprocessTransformedWindows(windows):
+def deprocessWindows(windows):
+    #full = np.zeros((windows.shape[0], DECOMP_SIZE))
+    #full[:, COEFF_SPLITS[1]:COEFF_SPLITS[2]] = windows
+    #rec = computeWaveletRecomp(full)
+    full = np.zeros((windows.shape[0], WINDOW_SIZE*4))
+    full[:, :WINDOW_SIZE] = windows
+    rec = computeSWTRecomp(full)
+
+    #windows[:, 0:160] = 0
+    #windows[:, 320:480] = 0
+    #rec = computeSWTRecomp(windows)
+    return rec
+
+def denormalizeWindows(windows):
+    #windows = np.arctanh(windows)
+    #windows = windows * 3.0
+    windows = (windows * stdWin) + meanWin
     return windows
 
-def unpreprocessOrigWindows(windows):
-    if (PREPROC_METHOD == 'fft'):
-        real = windows[:, :WINDOW_SIZE]
-        imag = windows[:, WINDOW_SIZE:]
-    
-        windows = real + (imag * 1j)
-        windows = ifft(windows)
-    elif (PREPROC_METHOD == 'dct'):
-        windows = idct(windows, type = 2, norm = 'ortho')   
- 
-    return windows
 
-def denormalizeTransformedWindows(windows):
-    windows = np.arctanh(windows)
-    windows = windows * 3.0
-    windows = (windows * stdTransformed) + meanTransformed
-    return windows
+def replaceInWindows(origWindows, autoencOutput):
+    processedWindows = computeSWTDecomp(origWindows)
 
-def denormalizeOrigWindows(windows):
-    windows = np.arctanh(windows)
-    windows = windows * 3.0
-    windows = (windows * stdOrig) + meanOrig
-    return windows
+    autoencOutput = denormalizeWindows(autoencOutput)
+    processedWindows[:, :WINDOW_SIZE] = autoencOutput
 
+    processedWindows = computeSWTRecomp(processedWindows)
+    return processedWindows
 
 
 
