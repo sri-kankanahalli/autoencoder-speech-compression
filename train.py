@@ -1,6 +1,3 @@
-import sys
-sys.dont_write_bytecode = True
-
 import os
 from numpy import round
 from pylab import *
