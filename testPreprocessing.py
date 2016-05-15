@@ -13,16 +13,12 @@ import matplotlib.pyplot as plt
 from windowingFunctions import *
 from params import *
 from utility import *
-from mfcc import *
 from preprocessing import *
 
 [rate, data] = sciwav.read("fiveYears.wav")
 windows = extractWindows(data)
 
 print "before preprocessing: ", windows.shape
-
-#computeSWTDecomp(windows)
-#exit()
 
 windows = processWindows(windows)
 computeMeanVariance(windows)
@@ -41,3 +37,6 @@ sciwav.write("out.wav", rate, reconstruction)
 r = reconstruction[:data.shape[0]]
 print "mse: ", mse(r, data)
 print "avg err: ", avgErr(r, data)
+
+
+

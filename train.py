@@ -21,7 +21,6 @@ from keras.constraints import *
 from windowingFunctions import *
 from params import *
 from utility import *
-from mfcc import *
 from preprocessing import *
 
 # read in WAV files
