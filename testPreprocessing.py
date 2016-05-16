@@ -15,7 +15,11 @@ from params import *
 from utility import *
 from preprocessing import *
 
-[rate, data] = sciwav.read("fiveYears.wav")
+fileToRead = "./fiveYears.wav"
+if (len(sys.argv) > 1):
+    fileToRead = sys.argv[1]
+
+[rate, data] = sciwav.read(fileToRead)
 windows = extractWindows(data)
 
 print "before preprocessing: ", windows.shape

@@ -1,3 +1,7 @@
+# don't write bytecode for any file
+import sys
+sys.dont_write_bytecode = True
+
 import os
 from numpy import round
 from pylab import *
@@ -16,139 +20,81 @@ from keras.layers.convolutional import *
 from keras.regularizers import *
 from keras.layers.advanced_activations import *
 from keras.layers.normalization import *
+from keras.layers.recurrent import *
 from keras.constraints import *
 
 from windowingFunctions import *
 from params import *
 from utility import *
 from preprocessing import *
+from load_TIMIT import *
 
-# read in WAV files
-print "Reading in .wav files..."
-fileList = filesInDir(DATA_DIR)
-rawWindows = []
-for filepath in fileList:
-    [rate, data] = sciwav.read(filepath)
-    windows = extractWindows(data)
-
-    if (rawWindows == []):
-        rawWindows = windows
-    else:
-        rawWindows = np.append(rawWindows, windows, axis=0)
-
-    #print filepath, ": ", windows.shape
-
-# randomly shuffle data
-if (RANDOM_SHUFFLE):
-    rawWindows = np.random.permutation(rawWindows)
-
-print "Raw windows shape: ", rawWindows.shape
+# read in TIMIT training set
+rawWindows = load_TIMIT_train()
 
 # transform data and convert to float
 print "Processing windows..."
 processedWindows = processWindows(rawWindows)
 processedWindows = processedWindows.astype(np.float32)
 
-# compute mean and variance, then normalize by them
+# compute mean and variance, then normalize
 computeMeanVariance(processedWindows)
 processedWindows = normalizeWindows(processedWindows)
+
+print processedWindows.shape
 
 print np.mean(np.abs(processedWindows), axis=None)
 print np.std(np.abs(processedWindows), axis=None)
 
-
 # 80/20 training/testing split
-split = round(processedWindows.shape[0] * 0.8)
+print processedWindows.shape
+split = int(round(processedWindows.shape[0] * 0.8))
 
 _train = (processedWindows[:split, :])
 _test  = (processedWindows[split:, :])
 
 autoencoder = Sequential()
+autoencoder.add(Reshape( (200,), input_shape = (200,)))
 
-#'''
-autoencoder.add(Reshape(input_shape = (120,), dims=(120,)))
-autoencoder.add(MaxoutDense(output_dim = 80, init = "glorot_normal", nb_feature = 15,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 60, init = "glorot_normal", nb_feature = 15,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 32, init = "glorot_normal", nb_feature = 10,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 10, init = "glorot_normal", nb_feature = 5,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 32, init = "glorot_normal", nb_feature = 5,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 60, init = "glorot_normal", nb_feature = 10,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 80, init = "glorot_normal", nb_feature = 15,
-                            W_constraint = maxnorm(1)))
-autoencoder.add(MaxoutDense(output_dim = 120, init = "glorot_normal", nb_feature = 15))
-#'''
+autoencoder.add(Dense(output_dim = 256, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
+autoencoder.add(Dense(output_dim = 128, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
+autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
+autoencoder.add(Dense(output_dim = 48, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
 
-'''
-autoencoder.add(Reshape(input_shape = (120,), dims=(120,)))
-autoencoder.add(Dense(output_dim = 60, init = "glorot_normal", #nb_feature = 20,
-                            W_constraint = maxnorm(2)))
-autoencoder.add(PReLU())
-#autoencoder.add(Activation("tanh"))
-autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", #nb_feature = 15,
-                            W_constraint = maxnorm(2)))
-autoencoder.add(PReLU())
-#autoencoder.add(Activation("tanh"))
-autoencoder.add(Dense(output_dim = 8, init = "glorot_normal", #nb_feature = 5,
-                            W_constraint = maxnorm(2)))
-autoencoder.add(PReLU())
-#autoencoder.add(Activation("tanh"))
-autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", #nb_feature = 15,
-                            W_constraint = maxnorm(2)))
-autoencoder.add(PReLU())
-#autoencoder.add(Activation("tanh"))
-autoencoder.add(Dense(output_dim = 60, init = "glorot_normal", #nb_feature = 20,
-                            W_constraint = maxnorm(2)))
-autoencoder.add(PReLU())
-#autoencoder.add(Activation("tanh"))
-autoencoder.add(Dense(output_dim = 120, init = "glorot_normal", #nb_feature = 25,
-                            W_constraint = maxnorm(2)))
-'''
+autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", activation='tanh',
+                      activity_regularizer = activity_l1(10e-5) ))
 
-'''
-autoencoder.add(Dense(input_shape = (160,), output_dim = 80, init = "glorot_normal",
-                       activation='tanh'))
-autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='tanh'))
-autoencoder.add(Dense(output_dim = 40, init = "glorot_normal"))
-autoencoder.add(GaussianDropout(0.1))
-autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='tanh'))
-autoencoder.add(Dense(output_dim = 80, init = "glorot_normal", activation='tanh'))
-autoencoder.add(Dense(output_dim = 160, init = "glorot_normal", activation="tanh"))
-#'''
+autoencoder.add(Dense(output_dim = 48, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
+autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
+autoencoder.add(Dense(output_dim = 128, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
+autoencoder.add(Dense(output_dim = 256, init = "glorot_normal", activation='relu'))
+#autoencoder.add(Dropout(0.05))
 
-# interesting observation: autoencoder going from raw => raw or dct => raw resembles
-#     a bandpass filter
-'''
-autoencoder.add(Reshape(input_shape = (40,), dims = (1, 40, 1)))
-autoencoder.add(Convolution2D(input_shape = (1, 40, 1), nb_filter = 32, nb_row = 10, nb_col = 1, init = "glorot_uniform",
-                              border_mode = "same"))
-autoencoder.add(PReLU())
-autoencoder.add(Flatten(input_shape=(32, 40, 1)))
-autoencoder.add(Dense(output_dim = 2048, init = "glorot_uniform"))
-autoencoder.add(PReLU())
-autoencoder.add(Dense(output_dim = 256, init = "glorot_uniform"))
-autoencoder.add(PReLU())
-autoencoder.add(Dense(output_dim = 15, init = "glorot_uniform"))
-autoencoder.add(PReLU())
-autoencoder.add(Dense(output_dim = 40, init = "glorot_uniform"))
-autoencoder.add(PReLU())
-autoencoder.add(Dense(output_dim = 40, init = "glorot_uniform", activation = "tanh"))
-#autoencoder.add(Reshape(input_shape = (40,), dims = (1, 40, 1)))
-#autoencoder.add(Convolution2D(input_shape = (1, 40, 1), nb_filter = 1, nb_row = 20, nb_col = 1, init = "glorot_uniform",
-#                              border_mode = "same"))
-#autoencoder.add(Reshape(input_shape = (1, 40, 1), dims = (40,)))
-#'''
+autoencoder.add(Dense(output_dim = 200, init = "glorot_normal", activation='tanh'))
 
-autoencoder.compile(loss = 'root_mean_squared_error', optimizer = Adam())
+autoencoder.compile(loss = custom_error_function, optimizer = Adam())
 
 autoencoder.fit(_train, _train, nb_epoch = NUM_EPOCHS, batch_size = BATCH_SIZE,
-		verbose = 1, validation_data = [_test, _test], show_accuracy = False)
+		verbose = 1, validation_data = [_test, _test], show_accuracy = True, shuffle=True)
 
+'''
+autoencoder.add(Reshape( (25, 1), input_shape = (25,)))
+autoencoder.add(Convolution1D(input_dim = 1,
+                              input_length = 25,
+                              nb_filter = 32,
+                              filter_length = 5,
+                              border_mode = "same",
+                              activation = "relu"))
+autoencoder.add(Dropout(0.1))
+autoencoder.add(Flatten())
+'''
 
 def autoencoderTest(waveFilename, prefix, replacement=False):
     [rate, data] = sciwav.read(waveFilename)
@@ -173,17 +119,18 @@ def autoencoderTest(waveFilename, prefix, replacement=False):
     nnReconstruction = reconstructFromWindows(predicted)
     sciwav.write(prefix + "output.wav", rate, nnReconstruction)
 
-    if replacement == True:
-        nnReplaced = replaceInWindows(windows, autoencOutput)
-        nnReplaced = reconstructFromWindows(nnReplaced)
-        sciwav.write(prefix + "replaced.wav", rate, nnReplaced)
+    #if replacement == True:
+    #    nnReplaced = replaceInWindows(windows, autoencOutput)
+    #    nnReplaced = reconstructFromWindows(nnReplaced)
+    #    sciwav.write(prefix + "replaced.wav", rate, nnReplaced)
 
     print waveFilename, " mse: ", mse(nnReconstruction, desiredReconstruction)
     print waveFilename, " avg err: ", avgErr(nnReconstruction, desiredReconstruction)
 
-autoencoderTest("./sp01.wav", "sp01", True)
+# SA1 is already trained; fiveYears and SX383 are not
+autoencoderTest("./SA1.WAV", "SA1", True)
 autoencoderTest("./fiveYears.wav", "fy", True)
-autoencoderTest("./sp19.wav", "sp19", True)
+autoencoderTest("./SX383.WAV", "SX383", True)
 
 
 

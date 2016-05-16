@@ -21,7 +21,7 @@ def computeWaveletDecomp(windows):
         i += 1
         if (VERBOSE):
             if (i % 2000 == 0):
-                print i, "/", numWindows
+                print (str(i) + " / " + str(numWindows))
     return waveletDecomp
 
 
@@ -41,7 +41,7 @@ def computeWaveletRecomp(windows):
         i += 1
         if (VERBOSE):
             if (i % 2000 == 0):
-                print i, "/", numWindows
+                print (str(i) + " / " + str(numWindows))
     return waveletRecomp
 
 

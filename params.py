@@ -18,8 +18,7 @@ OVERLAP_FUNC = sig.hann(OVERLAP_SIZE * 2)
 TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # directory that contains .wav files to process
-DATA_DIR = "./entire/"
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 30
 BATCH_SIZE = 64
 
 # randomly shuffle data before partitioning into training/validation?
@@ -28,17 +27,11 @@ RANDOM_SHUFFLE = True
 # sample rate of input file (used in MFCC calculation)
 SAMPLE_RATE = 16000
 
-# number of MFCC coefficients
-NUM_MFCC_COEFFS = 40
-
 # debug messages?
 VERBOSE = True
 
-# preprocessing method -- FFT or DCT?
-PREPROC_METHOD = 'raw'
-
 # wavelet settings
-WAVELET_TYPE = 'db16'
+WAVELET_TYPE = 'db6'
 WAVELET_MODE = 'per'
 WAVELET_LEVEL = 3
 
