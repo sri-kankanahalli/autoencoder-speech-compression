@@ -54,35 +54,114 @@ _train = (processedWindows[:split, :])
 _test  = (processedWindows[split:, :])
 
 autoencoder = Sequential()
-autoencoder.add(Reshape( (200,), input_shape = (200,)))
+autoencoder.add(Reshape( (200,), input_shape = (200,) ))
 
-autoencoder.add(Dense(output_dim = 256, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
-autoencoder.add(Dense(output_dim = 128, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
-autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
-autoencoder.add(Dense(output_dim = 48, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
+autoencoder.add(Reshape( (200, 1), input_shape = (200,) ))
 
-autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", activation='tanh',
-                      activity_regularizer = activity_l1(10e-5) ))
+# 200x1 -> 100x4
+autoencoder.add(Convolution1D(input_dim = 1,
+                              input_length = 200,
+                              nb_filter = 4,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "relu",
+                              init = "glorot_normal",
+                              subsample_length = 2))
 
-autoencoder.add(Dense(output_dim = 48, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
-autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
-autoencoder.add(Dense(output_dim = 128, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
-autoencoder.add(Dense(output_dim = 256, init = "glorot_normal", activation='relu'))
-#autoencoder.add(Dropout(0.05))
+# 100x4 -> 50x8
+autoencoder.add(Convolution1D(input_dim = 2,
+                              input_length = 100,
+                              nb_filter = 8,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "relu",
+                              init = "glorot_normal",
+                              subsample_length = 2))
 
+
+
+# 50x8 -> 25x16
+autoencoder.add(Convolution1D(nb_filter = 16,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "relu",
+                              init = "glorot_normal",
+                              subsample_length = 2))
+
+# !!! 25x16 -> 25x1 !!!
+autoencoder.add(Convolution1D(nb_filter = 1,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "tanh",
+                              init = "glorot_normal"))
+#autoencoder.add(LSTM(input_dim = 16,
+#                     input_length = 25,
+#                     output_dim = 1,
+#                     activation = 'tanh',
+#                     init = "glorot_normal",
+#                     return_sequences = True))
+
+# 25x1 -> 25x8
+autoencoder.add(Convolution1D(nb_filter = 8,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "relu",
+                              init = "glorot_normal"))
+
+# 25x8 -> 50x4
+autoencoder.add(UpSampling1D(length = 2))
+autoencoder.add(Convolution1D(nb_filter = 4,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "tanh",
+                              init = "glorot_normal"))
+
+# 50x4 -> 100x2
+autoencoder.add(UpSampling1D(length = 2))
+autoencoder.add(Convolution1D(nb_filter = 2,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "tanh",
+                              init = "glorot_normal"))
+
+# 100x2 -> 200x8
+autoencoder.add(UpSampling1D(length = 2))
+autoencoder.add(Convolution1D(nb_filter = 1,
+                              filter_length = 9,
+                              border_mode = "same",
+                              activation = "tanh",
+                              init = "glorot_normal"))
+
+# 200x8 -> 200x1
+#autoencoder.add(LSTM(input_dim = 8,
+#                     input_length = 200,
+#                     output_dim = 1,
+#                     activation = 'tanh',
+#                     init = "glorot_normal",
+#                     return_sequences = True))
+
+autoencoder.add(Flatten())
 autoencoder.add(Dense(output_dim = 200, init = "glorot_normal", activation='tanh'))
 
 autoencoder.compile(loss = custom_error_function, optimizer = Adam())
 
 autoencoder.fit(_train, _train, nb_epoch = NUM_EPOCHS, batch_size = BATCH_SIZE,
 		verbose = 1, validation_data = [_test, _test], show_accuracy = True, shuffle=True)
+
+'''
+autoencoder.add(Dense(output_dim = 256, init = "glorot_normal", activation='relu'))
+autoencoder.add(Dense(output_dim = 128, init = "glorot_normal", activation='relu'))
+autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='relu'))
+autoencoder.add(Dense(output_dim = 48, init = "glorot_normal", activation='relu'))
+
+autoencoder.add(Dense(output_dim = 32, init = "glorot_normal", activation='tanh',
+                      activity_regularizer = activity_l1(10e-5) ))
+
+autoencoder.add(Dense(output_dim = 48, init = "glorot_normal", activation='relu'))
+autoencoder.add(Dense(output_dim = 64, init = "glorot_normal", activation='relu'))
+autoencoder.add(Dense(output_dim = 128, init = "glorot_normal", activation='relu'))
+autoencoder.add(Dense(output_dim = 256, init = "glorot_normal", activation='relu'))
+'''
 
 '''
 autoencoder.add(Reshape( (25, 1), input_shape = (25,)))

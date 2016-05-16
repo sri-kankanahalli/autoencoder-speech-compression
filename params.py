@@ -18,7 +18,7 @@ OVERLAP_FUNC = sig.hann(OVERLAP_SIZE * 2)
 TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # directory that contains .wav files to process
-NUM_EPOCHS = 30
+NUM_EPOCHS = 1
 BATCH_SIZE = 64
 
 # randomly shuffle data before partitioning into training/validation?
