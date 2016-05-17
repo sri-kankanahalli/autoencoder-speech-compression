@@ -25,7 +25,6 @@ windows = extractWindows(data)
 print "before preprocessing: ", windows.shape
 
 windows = processWindows(windows)
-computeMeanVariance(windows)
 windows = normalizeWindows(windows)
 print "after preprocessing: ", windows.shape
 

@@ -34,11 +34,10 @@ rawWindows = load_TIMIT_train()
 
 # transform data and convert to float
 print "Processing windows..."
+
+# process and normalize
 processedWindows = processWindows(rawWindows)
 processedWindows = processedWindows.astype(np.float32)
-
-# compute mean and variance, then normalize
-computeMeanVariance(processedWindows)
 processedWindows = normalizeWindows(processedWindows)
 
 print processedWindows.shape
