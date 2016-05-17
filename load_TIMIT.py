@@ -31,7 +31,7 @@ def load_TIMIT_train():
 
         print (str(i) + ": " + filepath + "\r"),
         i += 1
-        if (i >= 1000): break
+        if (i >= 100): break
 
     rawWindows = np.array(rawWindows)
     rawWindows = rawWindows.astype(np.float32)

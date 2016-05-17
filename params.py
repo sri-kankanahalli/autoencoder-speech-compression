@@ -9,7 +9,7 @@ import operator
 import math
 
 # parameters for sliding window, and window function (Hann)
-STEP_SIZE = 160
+STEP_SIZE = 280
 OVERLAP_SIZE = 40
 WINDOW_SIZE = STEP_SIZE + OVERLAP_SIZE
 OVERLAP_FUNC = sig.hann(OVERLAP_SIZE * 2)

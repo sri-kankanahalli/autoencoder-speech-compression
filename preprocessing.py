@@ -79,14 +79,22 @@ def denormalize(thing):
     return (thing * (stdWin * 2)) + meanWin
 
 
-# (Theano) super advanced error function taking preprocessing and wavelet bands into account
+# (Theano) super advanced error function 
 def custom_error_function(y_true, y_pred):
-    # compute MSE over frequency domain
-    dct_true = theano_dct(y_true)
-    dct_pred = theano_dct(y_pred)
+    # transfer signals from time to frequency domain
+    dft_true = theano_dft(y_true)
+    dft_pred = theano_dft(y_pred)
 
-    diff = dct_true - dct_pred
-    error = T.mean(T.sqr(diff))
+    # compute difference in time and frequency domains
+    freq_diff = dft_true - dft_pred
+    time_diff = y_true - y_pred
+
+    # MSE in time and freq domain
+    mse_freq = T.mean(T.sqr(freq_diff))
+    mse_time = T.mean(T.sqr(time_diff))
+
+    # error is magnitude of (Rmse_freq, Rmse_time)
+    error = T.sqrt(mse_freq + mse_time)
     
     return error
 
