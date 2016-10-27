@@ -10,53 +10,30 @@ import os
 import scipy.io.wavfile as sciwav
 
 from windowingFunctions import *
-from params import *
 
-def load_TIMIT_train():
+def load_TIMIT_train(timitDir, numLoad = -1):
     print "Reading in .wav files..."
 
-    train_files_list = glob.glob(TIMIT_DIR + '/TIMIT/TRAIN/*/*/*.WAV')
+    train_files_list = glob.glob(timitDir + '/TIMIT/TRAIN/*/*/*.WAV')
 
-    rawWindows = []
+    rawData = []
     i = 0
     for filepath in train_files_list:
         [rate, data] = sciwav.read(filepath)
-        windows = extractWindows(data)
-        windows = windows.tolist()
+        data = data.astype(np.float64)
 
-        if (rawWindows == []):
-            rawWindows = windows
+        if (rawData == []):
+            rawData = [data]
         else:
-            rawWindows += windows
+            rawData += [data]
 
         print (str(i) + ": " + filepath + "\r"),
         i += 1
-        if (i >= 100): break
 
-    rawWindows = np.array(rawWindows)
-    rawWindows = rawWindows.astype(np.float32)
+        if (numLoad > 0):
+            if (i == numLoad): break
+        
 
-    print ""
-    print "Raw windows shape: ", rawWindows.shape
-    print np.amax(rawWindows)
-    print np.amin(rawWindows)
+    return rawData
 
-    # v simple data augmentation
-    rawWindowsX2 = np.clip(rawWindows * 2, -32767, 32767)
-    rawWindowsD2 = np.clip(rawWindows / 2, -32767, 32767)
-    #rawWindowsX3 = np.clip(rawWindows * 3, -32767, 32767)
-    #rawWindowsD3 = np.clip(rawWindows / 3, -32767, 32767)
 
-    augWindows = rawWindows
-    augWindows = np.append(augWindows, rawWindowsX2, axis=0)
-    augWindows = np.append(augWindows, rawWindowsD2, axis=0)
-    #augWindows = np.append(augWindows, rawWindowsX3, axis=0)
-    #augWindows = np.append(augWindows, rawWindowsD3, axis=0)
-
-    print "Augmented windows shape: ", augWindows.shape
-
-    # randomly shuffle data
-    if (RANDOM_SHUFFLE):
-        augWindows = np.random.permutation(augWindows)
-
-    return augWindows

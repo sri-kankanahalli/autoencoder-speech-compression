@@ -12,9 +12,7 @@ import scipy.io.wavfile as sciwav
 import matplotlib.pyplot as plt
 
 from theano import tensor as T
-from theano_dct import *
 
-from params import *
 from utility import *
 
 

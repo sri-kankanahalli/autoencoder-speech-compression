@@ -13,7 +13,8 @@ import subprocess
 import glob
 import os
 from sys import stdout
-from params import *
+
+TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # Lists all the wav files
 train_files_list = glob.glob(TIMIT_DIR + '/TIMIT/TRAIN/*/*/*.WAV')

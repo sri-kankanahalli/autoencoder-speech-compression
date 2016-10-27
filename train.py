@@ -156,7 +156,7 @@ autoencoder.add(Flatten())
 autoencoder.add(Dense(output_dim = 320, init = "glorot_normal", activation='tanh'))
 #'''
 
-autoencoder.compile(loss = custom_error_function, optimizer = Adam())
+autoencoder.compile(loss = 'mean_squared_error', optimizer = Adam())
 
 autoencoder.fit(_train, _train, nb_epoch = NUM_EPOCHS, batch_size = BATCH_SIZE,
 		verbose = 1, validation_data = [_test, _test], show_accuracy = True, shuffle=True)
