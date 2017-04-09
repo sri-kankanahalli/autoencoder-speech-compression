@@ -14,7 +14,7 @@ import glob
 import os
 from sys import stdout
 
-TIMIT_DIR = "/home/sri/Desktop/timit"
+from consts import *
 
 # Lists all the wav files
 train_files_list = glob.glob(TIMIT_DIR + '/TIMIT/TRAIN/*/*/*.WAV')

@@ -1,7 +1,7 @@
 # ==========================================================================
 # functions to load TIMIT .wavs, make train/val/test splits, and process
-# the dataset
-#     (mono, 16KHz, 32-bit)
+# the dataset into speech windows
+#     (all WAV files are mono, 16KHz, 16-bit)
 # REQUIREMENT: you need to have run convert_TIMIT.py first
 # ==========================================================================
 
@@ -12,7 +12,8 @@ import scipy.io.wavfile as sciwav
 import numpy as np
 import random
 
-from windowingFunctions import *
+from windowing import *
+from consts import *
 
 
 # ---------------------------------------------------
@@ -31,8 +32,6 @@ def get_wavs_contained(a_dir):
 # ---------------------------------------------------
 # load info about TIMIT from directory/file structure
 # ---------------------------------------------------
-# directory that contains TIMIT files
-TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # number of dialects in TIMIT (no reason this should be anything
 # other than 8, but it's here). when making our train/val/test
@@ -155,5 +154,78 @@ def load_raw_waveforms(lst):
         i += 1
     
     return rawData
+
+
+# ---------------------------------------------------
+# waveform preprocessing functions
+# ---------------------------------------------------
+def preprocess_waveform(waveform):
+    # scale waveform between -1 and 1 (maximizing its volume)
+    mn = np.min(waveform)
+    mx = np.max(waveform)
+    maxabs = np.maximum(np.abs(mn), np.abs(mx))
+        
+    return np.copy(waveform) / maxabs, (maxabs,)
+
+def unpreprocess_waveform(waveform, params):
+    return np.copy(waveform) * params[0]
+
+
+# ---------------------------------------------------
+# load and process TIMIT data into speech windows
+# ---------------------------------------------------
+def load_data(num_train, num_val, num_test):
+    # generate train/val/test split paths
+    train_paths, val_paths, test_paths = \
+        timit_train_test_val(num_train, num_val, num_test)
+
+    # raw waveforms
+    train_waveforms = load_raw_waveforms(train_paths)
+    val_waveforms = load_raw_waveforms(val_paths)
+    test_waveforms = load_raw_waveforms(test_paths)
+
+    # waveform preprocessing in action
+    train_procwave = np.copy(train_waveforms)
+    val_procwave = np.copy(val_waveforms)
+    test_procwave = np.copy(test_waveforms)
+
+    train_wparams = [()] * len(train_procwave)
+    val_wparams = [()] * len(val_procwave)
+    test_wparams = [()] * len(test_procwave)
+
+    # preprocess every waveform
+    for i in xrange(0, len(train_procwave)):
+        train_procwave[i], train_wparams[i] = \
+            preprocess_waveform(train_procwave[i])
+    for i in xrange(0, len(val_procwave)):
+        val_procwave[i], val_wparams[i] = \
+            preprocess_waveform(val_procwave[i])
+    for i in xrange(0, len(test_procwave)):
+        test_procwave[i], test_wparams[i] = \
+            preprocess_waveform(test_procwave[i])
+
+    # turn each waveform into a corresponding list of windows
+    train_windows = extract_windows_multiple(train_procwave, STEP_SIZE,
+                                             OVERLAP_SIZE, collapse = False)
+    val_windows = extract_windows_multiple(val_procwave, STEP_SIZE,
+                                           OVERLAP_SIZE, collapse = False)
+    test_windows = extract_windows_multiple(test_procwave, STEP_SIZE,
+                                            OVERLAP_SIZE, collapse = False)
+
+    # construct return values
+    paths = [train_paths, val_paths, test_paths]
+    waveforms = [train_waveforms, val_waveforms, test_waveforms]
+    processed = [train_procwave, val_procwave, test_procwave]
+    wparams = [train_wparams, val_wparams, test_wparams]
+    windows = [train_windows, val_windows, test_windows]
+
+    return paths, waveforms, processed, wparams, windows
+
+
+
+
+
+
+
 
 

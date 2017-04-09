@@ -1,8 +1,13 @@
+# ==========================================================================
+# functions to handle windowing of waveforms (extracting windows from a
+# waveform, and reconstructing a waveform from individual windows)
+# ==========================================================================
+
 import numpy as np
 import math
 
 # extract overlapping windows from waveform
-def extractWindows(data, stepSize, overlapSize):
+def extract_windows(data, stepSize, overlapSize):
     numWindows = int(math.ceil(float(len(data)) / stepSize))
     windowSize = stepSize + overlapSize
 
@@ -29,9 +34,10 @@ def extractWindows(data, stepSize, overlapSize):
     windows = windows.astype(np.float32)
     
     return windows
-    
+
+
 # reconstruct waveform from overlapping windows
-def reconstructFromWindows(windows, overlapSize, overlapFunc):
+def reconstruct_from_windows(windows, overlapSize, overlapFunc):
     reconstruction = []
     lastWindow = []
 
@@ -51,9 +57,6 @@ def reconstructFromWindows(windows, overlapSize, overlapFunc):
                 thisMult = overlapFunc[j]
                 lastMult = overlapFunc[j + overlapSize]
 
-                #thisMult = float(j) / OVERLAP_SIZE
-                #lastMult = 1 - thisMult
-
                 overlappedPart[j] = overlapThisWindow[j] * thisMult + \
                                     overlapLastWindow[j] * lastMult
 
@@ -61,14 +64,13 @@ def reconstructFromWindows(windows, overlapSize, overlapFunc):
             reconstruction = np.concatenate([reconstruction, unmodifiedPart])
         
     return reconstruction
-    
 
 
 # extract windows for list of waveforms
-def extractWindowsMultiple(wavelist, stepSize, overlapSize, collapse = False):
+def extract_windows_multiple(wavelist, stepSize, overlapSize, collapse = False):
     windowlist = []
     for waveform in wavelist:
-        windows = extractWindows(waveform, stepSize, overlapSize)
+        windows = extract_windows(waveform, stepSize, overlapSize)
 
         if (windowlist == []):
             windowlist = [windows]

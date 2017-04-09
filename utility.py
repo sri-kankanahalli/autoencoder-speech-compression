@@ -1,3 +1,7 @@
+# ==========================================================================
+# miscellaneous utility functions
+# ==========================================================================
+
 import numpy as np
 import math
 import os
@@ -10,9 +14,14 @@ def mse(a, b):
 def avgErr(a, b):
     return (abs(a - b)).mean(axis = None)
 
-# get list of files in directory
-def filesInDir(dirName):
-    fileList = next(os.walk(dirName))[2]
-    for i in xrange(0, len(fileList)):
-        fileList[i] = dirName + fileList[i]
-    return fileList
+# interleave numpy arrays of the same size along the first axis
+def interleave(arr):    
+    num = len(arr)
+    
+    r = np.empty(arr[0].shape)
+    r = np.repeat(r, num, axis = 0)
+    
+    for i in xrange(0, num):
+        r[i::num] = arr[i]
+    
+    return r
