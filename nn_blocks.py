@@ -15,125 +15,6 @@ import theano.tensor as T
 import theano
 
 from consts import *
-from entropy_estimation import entropy_estimate
-
-# ---------------------------------------------------
-# Theano operation to quantize input into specified
-# number of bins
-# ---------------------------------------------------
-class Quantize(T.Op):
-    # properties attribute
-    __props__ = ()
-    
-    def __init__(self, nbins):
-        self.nbins = nbins
-        super(Quantize, self).__init__()
-        
-    def make_node(self, x):
-        assert hasattr(self, '_props'), "Your version of theano is too old to support __props__."
-        x = T.as_tensor_variable(x)
-        return theano.Apply(self, [x], [x.type()])
-    
-    def perform(self, node, inputs, output_storage):
-        x, = inputs
-        z, = output_storage
-        
-        s = (x + 1.0) / 2.0
-        s = np.round(s * float(self.nbins - 1)) / float(self.nbins - 1)
-        s = (s * 2.0) - 1.0
-        
-        z[0] = s
-    
-    def grad(self, input, output_gradients):
-        # pass through gradients unchanged
-        x, = input
-        g, = output_gradients
-        return [g]
-        
-    def infer_shape(self, node, i0_shapes):
-        # output shape is same as input shape
-        return i0_shapes
-
-def QuantizeLayer(nbins):
-    return Lambda(lambda x : Quantize(nbins)(x),
-                  output_shape = lambda s : s)
-
-
-# ---------------------------------------------------
-# Theano operation to stochastically quantize input into specified
-# number of bins
-# ---------------------------------------------------
-class StochasticQuantize(T.Op):
-    # properties attribute
-    __props__ = ()
-    
-    def __init__(self, nbins):
-        self.nbins = nbins
-        super(StochasticQuantize, self).__init__()
-        
-    def make_node(self, x):
-        assert hasattr(self, '_props'), "Your version of theano is too old to support __props__."
-        x = T.as_tensor_variable(x)
-        return theano.Apply(self, [x], [x.type()])
-    
-    def perform(self, node, inputs, output_storage):
-        x, = inputs
-        z, = output_storage
-        
-        # transform from [-1, 1] to [0, 1]
-        s = (x + 1.0) / 2.0
-
-        # from [0, 1] to [0, NBINS - 1] (continuous)
-        s = s * float(self.nbins - 1)
-
-        # get decimals (which correspond to rounding probabilities)
-        prob_thresh = np.mod(s, 1.0)
-
-        # generate random values in [0, 1) and use those to make rounding
-        # decisions
-        probs = np.random.random_sample(s.shape)
-        rnd = np.greater(prob_thresh, probs)
-
-        # from [0, NBINS - 1] (continuous) to [0, NBINS - 1] (discrete)
-        s = np.floor(s) + rnd
-
-        # from [0, BINS - 1] to [0, 1]
-        s = s / float(self.nbins - 1)
-
-        # from [0, 1] to [-1, 1]
-        s = (s * 2.0) - 1.0
-        
-        z[0] = s
-    
-    def grad(self, input, output_gradients):
-        # pass through gradients unchanged (since the expected value of
-        # rounding is just x)
-        x, = input
-        g, = output_gradients
-        return [g]
-        
-    def infer_shape(self, node, i0_shapes):
-        # output shape is same as input shape
-        return i0_shapes
-
-
-class StochasticQuantizeLayer(Layer):
-    def __init__(self, nbins, **kwargs):
-        super(StochasticQuantizeLayer, self).__init__(**kwargs)
-        self.nbins = nbins
-        self.uses_learning_phase = True
-    
-    def build(self, input_shape):
-        self.train_op = StochasticQuantize(self.nbins)
-        self.test_op = Quantize(self.nbins)
-        self.trainable_weights = []
-    
-    def call(self, x, mask=None):
-        x = K.in_train_phase(self.train_op(x), self.test_op(x))
-        return x
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
 
 # ---------------------------------------------------
 # "Phase shift" upsampling layer, as discussed in [that one
@@ -317,11 +198,7 @@ def EuclideanDistance():
 
 # map for load_model
 KERAS_LOAD_MAP = {'PhaseShiftUp1D' : PhaseShiftUp1D,
-                  'Quantize' : Quantize,
-                  'StochasticQuantize' : StochasticQuantize,
-                  'StochasticQuantizeLayer' : StochasticQuantizeLayer,
                   'NBINS' : NBINS,
-                  'entropy_estimate' : entropy_estimate,
                   'rmse' : rmse,
                   'EuclideanDistance': EuclideanDistance}
 
