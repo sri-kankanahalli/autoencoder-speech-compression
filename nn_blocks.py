@@ -60,14 +60,11 @@ def residual_block(num_chans, filt_size, dilation = 1):
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
-                     use_bias = True,
                      dilation_rate = dilation)(input)
         res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, 1, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear',
-                     use_bias = True,
-                     dilation_rate = dilation)(res)
+                     activation = 'linear')(res)
         res = activation()(res)
         
         m = Add()([shortcut, res])
@@ -90,7 +87,7 @@ def channel_increase_block(num_chans, filt_size, from_chan = 1):
                      kernel_initializer = W_INIT,
                      activation = 'linear')(input)
         res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, 1, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
         res = activation()(res)
@@ -111,7 +108,7 @@ def downsample_block(num_chans, filt_size):
                      activation = 'linear',
                      strides = 2)(input)
         res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, 1, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
         res = activation()(res)
@@ -154,11 +151,11 @@ def channel_decrease_block(num_chans, filt_size, to_chan = 1):
             shortcut = UpSampling1D(to_chan)(shortcut)
             shortcut = Permute((2, 1))(shortcut)
         
-        res = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(to_chan, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(input)
         res = activation()(res)
-        res = Conv1D(to_chan, filt_size, padding = 'same',
+        res = Conv1D(to_chan, 1, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
         res = activation()(res)
@@ -195,12 +192,6 @@ def EuclideanDistance():
         return (shape1[0], 1)
 
     return Lambda(func, output_shape = shape)
-
-# map for load_model
-KERAS_LOAD_MAP = {'PhaseShiftUp1D' : PhaseShiftUp1D,
-                  'NBINS' : NBINS,
-                  'rmse' : rmse,
-                  'EuclideanDistance': EuclideanDistance}
 
 
 

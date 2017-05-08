@@ -16,9 +16,6 @@ SAMPLE_RATE = 16000
 # directory that contains TIMIT files
 TIMIT_DIR = "/home/sri/Desktop/timit"
 
-# number of bins to quantize codes into
-NBINS = 256
-
 # weight initialization used in all layers of network
 W_INIT = 'glorot_normal'
 
