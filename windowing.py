@@ -20,7 +20,6 @@ def extract_windows(data, stepSize, overlapSize):
         frame = data[startOfFrame : endOfFrame]
 
         # pad frame to proper size, if there's not enough data
-        #     (this should only happen for the last frame in a file)
         if len(frame) < windowSize:
             frame = np.pad(frame, (0, windowSize - len(frame)), \
                            'constant', constant_values=[0])

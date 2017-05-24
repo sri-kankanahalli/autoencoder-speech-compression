@@ -28,11 +28,11 @@ def run_pesq_filenames(clean, to_eval):
 # interface to PESQ evaluation, taking in two waveforms as input
 def run_pesq_waveforms(clean_wav, dirty_wav):
     # compute PESQ between original and corrupted waveforms
-    sciwav.write("./clean.wav", SAMPLE_RATE, clean_wav.astype(np.int16))
-    sciwav.write("./dirty.wav", SAMPLE_RATE, dirty_wav.astype(np.int16))
-    pesq = run_pesq_filenames("./clean.wav", "./dirty.wav")
-    os.system("rm ./clean.wav")
-    os.system("rm ./dirty.wav")
+    sciwav.write("./clean2.wav", SAMPLE_RATE, clean_wav.astype(np.int16))
+    sciwav.write("./dirty2.wav", SAMPLE_RATE, dirty_wav.astype(np.int16))
+    pesq = run_pesq_filenames("./clean2.wav", "./dirty2.wav")
+    os.system("rm ./clean2.wav")
+    os.system("rm ./dirty2.wav")
     
     return pesq
 

@@ -144,7 +144,7 @@ def load_raw_waveforms(lst):
     for filepath in lst:
         [rate, data] = sciwav.read(filepath)
         data = data.astype(np.float64)
-        
+
         if (rawData == []):
             rawData = [data]
         else:
@@ -174,7 +174,11 @@ def unpreprocess_waveform(waveform, params):
 # ---------------------------------------------------
 # load and process TIMIT data into speech windows
 # ---------------------------------------------------
-def load_data(num_train, num_val, num_test):
+def load_data(num_train, num_val, num_test,
+              pre_func = None):
+    if (pre_func is None):
+        pre_func = preprocess_waveform
+
     # generate train/val/test split paths
     train_paths, val_paths, test_paths = \
         timit_train_test_val(num_train, num_val, num_test)
@@ -196,13 +200,13 @@ def load_data(num_train, num_val, num_test):
     # preprocess every waveform
     for i in xrange(0, len(train_procwave)):
         train_procwave[i], train_wparams[i] = \
-            preprocess_waveform(train_procwave[i])
+            pre_func(train_procwave[i])
     for i in xrange(0, len(val_procwave)):
         val_procwave[i], val_wparams[i] = \
-            preprocess_waveform(val_procwave[i])
+            pre_func(val_procwave[i])
     for i in xrange(0, len(test_procwave)):
         test_procwave[i], test_wparams[i] = \
-            preprocess_waveform(test_procwave[i])
+            pre_func(test_procwave[i])
 
     # turn each waveform into a corresponding list of windows
     train_windows = extract_windows_multiple(train_procwave, STEP_SIZE,

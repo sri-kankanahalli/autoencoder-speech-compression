@@ -42,6 +42,14 @@ class PhaseShiftUp1D(Layer):
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1] * self.n, input_shape[2] / self.n)
 
+    def get_config(self):
+        config = {
+            'n' : self.n
+        }
+        base_config = super(PhaseShiftUp1D, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 
 # ---------------------------------------------------
 # Different types of "blocks" that make up all of our
@@ -62,13 +70,58 @@ def residual_block(num_chans, filt_size, dilation = 1):
                      activation = 'linear',
                      dilation_rate = dilation)(input)
         res = activation()(res)
-        res = Conv1D(num_chans, 1, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
+                     activation = 'linear',
+                     dilation_rate = dilation)(res)
         res = activation()(res)
         
         m = Add()([shortcut, res])
         return m
+    
+    return f
+
+
+# downsample the signal 2x
+def downsample_block(num_chans, filt_size):
+    def f(input):
+        #shortcut = AveragePooling1D(2)(input)
+        
+        res = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(input)
+        res = activation()(res)
+        res = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(res)
+        res = activation()(res)
+        res = AveragePooling1D(2)(res)
+        return res
+
+        #m = Add()([shortcut, res])
+        #return m
+    
+    return f
+
+
+# upsample the signal 2x
+def upsample_block(num_chans, filt_size):
+    def f(input):
+        #shortcut = UpSampling1D(2)(input)
+        
+        res = Conv1D(num_chans * 2, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(input)
+        res = PhaseShiftUp1D(2)(res)
+        res = activation()(res)
+        res = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(res)
+        res = activation()(res)
+        return res
+
+        #m = Add()([shortcut, res])
+        #return m
     
     return f
 
@@ -87,48 +140,6 @@ def channel_increase_block(num_chans, filt_size, from_chan = 1):
                      kernel_initializer = W_INIT,
                      activation = 'linear')(input)
         res = activation()(res)
-        res = Conv1D(num_chans, 1, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
-        res = activation()(res)
-        
-        m = Add()([shortcut, res])
-        return m
-        
-    return f
-
-
-# downsample the signal 2x
-def downsample_block(num_chans, filt_size):
-    def f(input):
-        shortcut = AveragePooling1D(2)(input)
-        
-        res = Conv1D(num_chans, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear',
-                     strides = 2)(input)
-        res = activation()(res)
-        res = Conv1D(num_chans, 1, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
-        res = activation()(res)
-        
-        m = Add()([shortcut, res])
-        return m
-    
-    return f
-
-
-# upsample the signal 2x
-def upsample_block(num_chans, filt_size):
-    def f(input):
-        shortcut = UpSampling1D(2)(input)
-        
-        res = Conv1D(num_chans * 2, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(input)
-        res = PhaseShiftUp1D(2)(res)
-        res = activation()(res)
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
@@ -136,15 +147,15 @@ def upsample_block(num_chans, filt_size):
         
         m = Add()([shortcut, res])
         return m
-    
+        
     return f
 
 
-# increase number of channels from num_chans to to_chan via convolution
+# decrease number of channels from num_chans to to_chan via convolution
 def channel_decrease_block(num_chans, filt_size, to_chan = 1):
     def f(input):
         shortcut = Permute((2, 1))(input)
-        shortcut = GlobalAveragePooling1D()(shortcut)
+        shortcut = GlobalMaxPooling1D()(shortcut)
         shortcut = Reshape((-1, 1))(shortcut)
         if (to_chan > 1):
             shortcut = Permute((2, 1))(shortcut)
@@ -180,6 +191,8 @@ def make_trainable(net, val):
     net.trainable = val
     for l in net.layers:
         l.trainable = val
+        if (l is Model):
+            make_trainable(l, val)
 
 # euclidean distance "layer"
 def EuclideanDistance():
@@ -193,6 +206,15 @@ def EuclideanDistance():
 
     return Lambda(func, output_shape = shape)
 
+# correlation loss function for samples of one variable
+def correlation(var1, var2):
+    var1 = K.flatten(var1)
+    var2 = K.flatten(var2)
+    
+    covariance = K.mean(var1 * var2) - K.mean(var1) * K.mean(var2)
+    denom = K.std(var1) * K.std(var2) + K.epsilon()
+    correlation = covariance / denom
+    return correlation
 
 
 
