@@ -20,8 +20,8 @@ from consts import *
 # "Phase shift" upsampling layer, as discussed in [that one
 # superresolution paper]
 #
-# Takes vector of size: B x S  x nF
-# And returns fector:   B x nS x F
+# Takes vector of size: B x S  x nC
+# And returns vector:   B x nS x C
 # ---------------------------------------------------
 class PhaseShiftUp1D(Layer):
     def __init__(self, n, **kwargs):
@@ -67,39 +67,63 @@ def residual_block(num_chans, filt_size, dilation = 1):
         
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear',
+                     activation = 'tanh',
                      dilation_rate = dilation)(input)
-        res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear',
-                     dilation_rate = dilation)(res)
-        res = activation()(res)
         
-        m = Add()([shortcut, res])
+        gate = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'sigmoid',
+                     dilation_rate = dilation)(input)
+        
+        sig = Multiply()([shortcut, gate])
+        m = Add()([sig, res])
         return m
     
+    return f
+
+
+# change number of channels to to_chan via convolution
+def channel_change_block(to_chan, filt_size, last_activ = True):
+    def f(input):
+        shortcut = Permute((2, 1))(input)
+        shortcut = GlobalAveragePooling1D()(shortcut)
+        shortcut = Reshape((1, -1))(shortcut)
+        shortcut = UpSampling1D(to_chan)(shortcut)
+        shortcut = Permute((2, 1))(shortcut)
+ 
+        res = Conv1D(to_chan, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'tanh')(input)
+
+        gate = Conv1D(to_chan, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'sigmoid')(input)
+
+        sig = Multiply()([shortcut, gate])
+        m = Add()([sig, res])
+        return m
+        
     return f
 
 
 # downsample the signal 2x
 def downsample_block(num_chans, filt_size):
     def f(input):
-        #shortcut = AveragePooling1D(2)(input)
+        shortcut = AveragePooling1D(2)(input)
         
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(input)
-        res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
-        res = activation()(res)
-        res = AveragePooling1D(2)(res)
-        return res
+                     activation = 'tanh',
+                     strides = 2)(input)
 
-        #m = Add()([shortcut, res])
-        #return m
+        gate = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'sigmoid',
+                     strides = 2)(input)
+
+        sig = Multiply()([shortcut, gate])
+        m = Add()([sig, res])
+        return m
     
     return f
 
@@ -107,73 +131,22 @@ def downsample_block(num_chans, filt_size):
 # upsample the signal 2x
 def upsample_block(num_chans, filt_size):
     def f(input):
-        #shortcut = UpSampling1D(2)(input)
+        shortcut = UpSampling1D(2)(input)
         
         res = Conv1D(num_chans * 2, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(input)
+                     activation = 'tanh')(input)
         res = PhaseShiftUp1D(2)(res)
-        res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
-        res = activation()(res)
-        return res
 
-        #m = Add()([shortcut, res])
-        #return m
+        gate = Conv1D(num_chans * 2, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'sigmoid')(input)
+        gate = PhaseShiftUp1D(2)(gate)
+
+        sig = Multiply()([shortcut, gate])
+        m = Add()([sig, res])
+        return m
     
-    return f
-
-
-# increase number of channels from from_chan to num_chans via convolution
-def channel_increase_block(num_chans, filt_size, from_chan = 1):
-    def f(input):
-        if (num_chans % from_chan != 0):
-            raise ValueError('num_chans must be divisible by from_chan')
-
-        shortcut = Permute((2, 1))(input)
-        shortcut = UpSampling1D(num_chans / from_chan)(shortcut)
-        shortcut = Permute((2, 1))(shortcut)
-        
-        res = Conv1D(num_chans, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(input)
-        res = activation()(res)
-        res = Conv1D(num_chans, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
-        res = activation()(res)
-        
-        m = Add()([shortcut, res])
-        return m
-        
-    return f
-
-
-# decrease number of channels from num_chans to to_chan via convolution
-def channel_decrease_block(num_chans, filt_size, to_chan = 1):
-    def f(input):
-        shortcut = Permute((2, 1))(input)
-        shortcut = GlobalMaxPooling1D()(shortcut)
-        shortcut = Reshape((-1, 1))(shortcut)
-        if (to_chan > 1):
-            shortcut = Permute((2, 1))(shortcut)
-            shortcut = UpSampling1D(to_chan)(shortcut)
-            shortcut = Permute((2, 1))(shortcut)
-        
-        res = Conv1D(to_chan, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(input)
-        res = activation()(res)
-        res = Conv1D(to_chan, 1, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear')(res)
-        res = activation()(res)
-
-        m = Add()([shortcut, res])
-        return m
-
     return f
 
 
