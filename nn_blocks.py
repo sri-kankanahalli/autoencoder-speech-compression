@@ -11,6 +11,7 @@ from keras.layers.normalization import *
 from keras.optimizers import *
 from keras import backend as K
 from keras.regularizers import *
+from keras.initializers import *
 import theano.tensor as T
 import theano
 
@@ -61,29 +62,42 @@ def activation():
     return LeakyReLU(0.3)
 
 # residual block, going from NCHAN to NCHAN channels
-def residual_block(num_chans, filt_size, dilation = 1):
+def residual_block(num_chans, filt_size, dilation = 1, gate = True):
     def f(input):
         shortcut = input
         
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'tanh',
+                     activation = 'linear',
                      dilation_rate = dilation)(input)
-        
-        gate = Conv1D(num_chans, filt_size, padding = 'same',
+        res = activation()(res)
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'sigmoid',
-                     dilation_rate = dilation)(input)
-        
-        sig = Multiply()([shortcut, gate])
-        m = Add()([sig, res])
-        return m
+                     activation = 'linear',
+                     dilation_rate = dilation)(res)
+
+        if (gate):
+            shortcut_gate = Conv1D(num_chans, 1, padding = 'same',
+                                   kernel_initializer = W_INIT,
+                                   bias_initializer = Constant(3),
+                                   activation = 'sigmoid',
+                                   dilation_rate = dilation)(input)
+            shortcut = Multiply()([shortcut, shortcut_gate])
+
+            res_gate = Conv1D(num_chans, 1, padding = 'same',
+                              kernel_initializer = W_INIT,
+                              bias_initializer = Constant(3),
+                              activation = 'sigmoid',
+                              dilation_rate = dilation)(input)
+            res = Multiply()([res, res_gate])
+
+        return Add()([shortcut, res])
     
     return f
 
 
 # change number of channels to to_chan via convolution
-def channel_change_block(to_chan, filt_size, last_activ = True):
+def channel_change_block(to_chan, filt_size, gate = True):
     def f(input):
         shortcut = Permute((2, 1))(input)
         shortcut = GlobalAveragePooling1D()(shortcut)
@@ -93,59 +107,94 @@ def channel_change_block(to_chan, filt_size, last_activ = True):
  
         res = Conv1D(to_chan, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'tanh')(input)
-
-        gate = Conv1D(to_chan, filt_size, padding = 'same',
+                     activation = 'linear')(input)
+        res = activation()(res)
+        res = Conv1D(to_chan, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'sigmoid')(input)
+                     activation = 'linear')(res)
 
-        sig = Multiply()([shortcut, gate])
-        m = Add()([sig, res])
-        return m
+        if (gate):
+            shortcut_gate = Conv1D(to_chan, 1, padding = 'same',
+                                   kernel_initializer = W_INIT,
+                                   bias_initializer = Constant(3),
+                                   activation = 'sigmoid')(input)
+            shortcut = Multiply()([shortcut, shortcut_gate])
+
+            res_gate = Conv1D(to_chan, 1, padding = 'same',
+                              kernel_initializer = W_INIT,
+                              bias_initializer = Constant(3),
+                              activation = 'sigmoid')(input)
+            res = Multiply()([res, res_gate])
+
+        return Add()([shortcut, res])
         
     return f
 
 
 # downsample the signal 2x
-def downsample_block(num_chans, filt_size):
+def downsample_block(num_chans, filt_size, gate = True):
     def f(input):
         shortcut = AveragePooling1D(2)(input)
         
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'tanh',
+                     activation = 'linear',
                      strides = 2)(input)
-
-        gate = Conv1D(num_chans, filt_size, padding = 'same',
+        res = activation()(res)
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'sigmoid',
-                     strides = 2)(input)
+                     activation = 'linear')(res)
 
-        sig = Multiply()([shortcut, gate])
-        m = Add()([sig, res])
-        return m
-    
+        if (gate):
+            shortcut_gate = Conv1D(num_chans, 1, padding = 'same',
+                                   kernel_initializer = W_INIT,
+                                   bias_initializer = Constant(3),
+                                   activation = 'sigmoid',
+                                   strides = 2)(input)
+            shortcut = Multiply()([shortcut, shortcut_gate])
+
+            res_gate = Conv1D(num_chans, 1, padding = 'same',
+                              kernel_initializer = W_INIT,
+                              bias_initializer = Constant(3),
+                              activation = 'sigmoid',
+                              strides = 2)(input)
+            res = Multiply()([res, res_gate])
+
+        return Add()([shortcut, res])
+
     return f
 
 
 # upsample the signal 2x
-def upsample_block(num_chans, filt_size):
+def upsample_block(num_chans, filt_size, gate = True):
     def f(input):
         shortcut = UpSampling1D(2)(input)
         
         res = Conv1D(num_chans * 2, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'tanh')(input)
+                     activation = 'linear')(input)
         res = PhaseShiftUp1D(2)(res)
-
-        gate = Conv1D(num_chans * 2, filt_size, padding = 'same',
+        res = activation()(res)
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'sigmoid')(input)
-        gate = PhaseShiftUp1D(2)(gate)
+                     activation = 'linear')(res)
 
-        sig = Multiply()([shortcut, gate])
-        m = Add()([sig, res])
-        return m
+        if (gate):
+            shortcut_gate = Conv1D(num_chans * 2, 1, padding = 'same',
+                                   kernel_initializer = W_INIT,
+                                   bias_initializer = Constant(3),
+                                   activation = 'sigmoid')(input)
+            shortcut_gate = PhaseShiftUp1D(2)(shortcut_gate)
+            shortcut = Multiply()([shortcut, shortcut_gate])
+
+            res_gate = Conv1D(num_chans * 2, 1, padding = 'same',
+                              kernel_initializer = W_INIT,
+                              bias_initializer = Constant(3),
+                              activation = 'sigmoid')(input)
+            res_gate = PhaseShiftUp1D(2)(res_gate)
+            res = Multiply()([res, res_gate])
+
+        return Add()([shortcut, res])
     
     return f
 

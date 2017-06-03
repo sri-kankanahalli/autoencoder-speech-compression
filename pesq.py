@@ -9,6 +9,7 @@ import re
 import os
 import scipy.io.wavfile as sciwav
 import numpy as np
+import random
 
 from load_data import *
 from windowing import *
@@ -27,12 +28,19 @@ def run_pesq_filenames(clean, to_eval):
     
 # interface to PESQ evaluation, taking in two waveforms as input
 def run_pesq_waveforms(clean_wav, dirty_wav):
+    # append random number to filename, so multiple simultaneous PESQ runs
+    # don't interfere with each other (most likely...)
+    #     TODO: turn "most likely" into "guarantee"
+    random_suffix = str(random.randint(0, 99999999))
+    clean_fname = "./temp/clean_" + random_suffix + ".wav"
+    dirty_fname = "./temp/dirty_" + random_suffix + ".wav"
+
     # compute PESQ between original and corrupted waveforms
-    sciwav.write("./clean2.wav", SAMPLE_RATE, clean_wav.astype(np.int16))
-    sciwav.write("./dirty2.wav", SAMPLE_RATE, dirty_wav.astype(np.int16))
-    pesq = run_pesq_filenames("./clean2.wav", "./dirty2.wav")
-    os.system("rm ./clean2.wav")
-    os.system("rm ./dirty2.wav")
+    sciwav.write(clean_fname, SAMPLE_RATE, clean_wav.astype(np.int16))
+    sciwav.write(dirty_fname, SAMPLE_RATE, dirty_wav.astype(np.int16))
+    pesq = run_pesq_filenames(clean_fname, dirty_fname)
+    os.system("rm " + clean_fname)
+    os.system("rm " + dirty_fname)
     
     return pesq
 
