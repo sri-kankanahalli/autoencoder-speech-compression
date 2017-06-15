@@ -1,12 +1,11 @@
 import numpy as np
-import theano.tensor as T
-import theano
 import math
 from numpy.fft import fft, ifft
 from scipy.fftpack import dct, idct
-from keras import backend as K
 
 from consts import *
+from utility import *
+from keras import backend as K
 
 # ====================================================================
 #  DCT (Discrete Cosine Transform)
@@ -25,15 +24,9 @@ def generate_dct_mat(n, norm = 'ortho'):
 #     this returns an array M x A where every one of the M samples has been independently
 #     filtered by the DCT matrix passed in
 def theano_dct(x, dct_mat):
-    import theano.tensor as T
-
     # reshape x into 2D array, and perform appropriate matrix operation
-    reshaped_x = x.reshape((1, x.shape[0], x.shape[1]))
-
-    result = T.tensordot(dct_mat, reshaped_x, [[0], [2]])
-    result = result.reshape((result.shape[0], result.shape[2])).T
-
-    return result
+    reshaped_x = K.reshape(x, (-1, dct_mat.shape[0]))
+    return K.dot(reshaped_x, dct_mat)
 
 # ====================================================================
 #  DFT (Discrete Fourier Transform)
@@ -45,23 +38,16 @@ def generate_dft_mats(n):
     mat = np.fft.fft(np.eye(n))
     return K.variable(np.real(mat)), K.variable(np.imag(mat))
 
-# given a (symbolic Theano) array of size M x WINDOW_SIZE [or M x WINDOW_SIZE x 1]
+# given a (symbolic Theano) array of size M x WINDOW_SIZE
 #     this returns an array M x WINDOW_SIZE where every one of the M samples has been replaced by
 #     its DFT magnitude, using the DFT matrices passed in
 def theano_dft_mag(x, real_mat, imag_mat):
-    import theano.tensor as T
+    reshaped_x = K.reshape(x, (-1, real_mat.shape[0]))
+    real = K.dot(reshaped_x, real_mat)
+    imag = K.dot(reshaped_x, imag_mat)
 
-    reshaped_x = x.reshape((1, x.shape[0], x.shape[1]))
-
-    real = T.tensordot(real_mat, reshaped_x, [[0], [2]])
-    real = real.reshape((real.shape[0], real.shape[2])).T
-    
-    imag = T.tensordot(imag_mat, reshaped_x, [[0], [2]])
-    imag = imag.reshape((imag.shape[0], imag.shape[2])).T
-
-    result = T.sqrt(T.sqr(real) + T.sqr(imag) + K.epsilon())
-
-    return result
+    mag = K.sqrt(K.square(real) + K.square(imag) + K.epsilon())
+    return mag
 
 # ====================================================================
 #  MFCC (Mel Frequency Cepstral Coefficients)

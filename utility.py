@@ -14,14 +14,22 @@ def mse(a, b):
 def avgErr(a, b):
     return (abs(a - b)).mean(axis = None)
 
-# interleave numpy arrays of the same size along the first axis
-def interleave(arr):    
-    num = len(arr)
-    
-    r = np.empty(arr[0].shape)
-    r = np.repeat(r, num, axis = 0)
-    
-    for i in xrange(0, num):
-        r[i::num] = arr[i]
-    
-    return r
+# hackily patches a really stupid TensorFlow bug affecting K.reshape
+import tensorflow as tf
+from keras import backend as K
+
+def new_reshape(x, shape):
+    fixed_shape = tuple([int(w) for w in shape])
+    return tf.reshape(x, fixed_shape)
+
+K.reshape = new_reshape
+
+
+
+
+
+
+
+
+
+
