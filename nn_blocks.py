@@ -131,7 +131,7 @@ def activation(init = 0.3):
 #     - downsampling
 #     - channel_change
 # as well as a gating operation and dilated convolutions
-def residual_block(num_chans, filt_size, dilation = 1, gate = True,
+def residual_block(num_chans, filt_size, dilation = 1, gate = False,
                    operation = 'none'):
     def f(inp):
         # ---------------------------------------
@@ -177,47 +177,26 @@ def residual_block(num_chans, filt_size, dilation = 1, gate = True,
             res = PhaseShiftUp1D(2)(res)
         res = activation(0.3)(res)
 
-
-        '''
-        noise = Lambda(lambda x : K.random_uniform(K.shape(x), 0.0, 1.0),
-                       output_shape = lambda s : s)(res)
-
-        noise_gate = Conv1D(conv1_nc, filt_size, padding = 'same',
-                            kernel_initializer = W_INIT,
-                            activation = 'tanh',
-                            dilation_rate = 1,
-                            strides = conv1_stride)(inp)
-        if (operation == 'upsample'):
-            noise_gate = PhaseShiftUp1D(2)(noise_gate)
-        gated_noise = Multiply()([noise, noise_gate])
-        
-        res = Add()([res, gated_noise])  
-        '''                 
-
+        if (operation != 'none'):
+            return res
 
         # ---------------------------------------
         # gating (if enabled)
         # ---------------------------------------
         if (gate):
-            res_gate = Conv1D(conv1_nc, 3, padding = 'same',
-                              kernel_initializer = W_INIT,
-                              bias_initializer = Constant(3),
-                              activation = 'sigmoid',
-                              dilation_rate = 1,
-                              strides = conv1_stride)(inp)
-            if (operation == 'upsample'):
-                res_gate = PhaseShiftUp1D(2)(res_gate)
-            res = Multiply()([res, res_gate])
-
             shortcut_gate = Conv1D(conv1_nc, 3, padding = 'same',
                                    kernel_initializer = W_INIT,
                                    bias_initializer = Constant(3),
                                    activation = 'sigmoid',
-                                   dilation_rate = 1,
+                                   dilation_rate = dilation,
                                    strides = conv1_stride)(inp)
             if (operation == 'upsample'):
                 shortcut_gate = PhaseShiftUp1D(2)(shortcut_gate)
             shortcut = Multiply()([shortcut, shortcut_gate])
+
+            res_gate = Lambda(lambda x : 1.0 - x,
+                              output_shape = lambda s : s)(shortcut_gate)
+            res = Multiply()([res, res_gate])
 
         # ---------------------------------------
         # final output

@@ -10,9 +10,13 @@ import os
 import scipy.io.wavfile as sciwav
 import numpy as np
 import random
+import ctypes
 
 from load_data import *
 from windowing import *
+
+pesq_dll = ctypes.CDLL('./PESQ.so')
+pesq_dll.pesq.restype = ctypes.c_double
 
 # interface to PESQ evaluation, taking in two filenames as input
 def run_pesq_filenames(clean, to_eval):
@@ -25,24 +29,16 @@ def run_pesq_filenames(clean, to_eval):
         return 0.0
     else:
         return float(regex_result.group(1))
-    
+
 # interface to PESQ evaluation, taking in two waveforms as input
 def run_pesq_waveforms(clean_wav, dirty_wav):
-    # append random number to filename, so multiple simultaneous PESQ runs
-    # don't interfere with each other (most likely...)
-    #     TODO: turn "most likely" into "guarantee"
-    random_suffix = str(random.randint(0, 99999999))
-    clean_fname = "./temp/clean_" + random_suffix + ".wav"
-    dirty_fname = "./temp/dirty_" + random_suffix + ".wav"
+    clean_wav = clean_wav.astype(np.double)
+    dirty_wav = dirty_wav.astype(np.double)
 
-    # compute PESQ between original and corrupted waveforms
-    sciwav.write(clean_fname, SAMPLE_RATE, clean_wav.astype(np.int16))
-    sciwav.write(dirty_fname, SAMPLE_RATE, dirty_wav.astype(np.int16))
-    pesq = run_pesq_filenames(clean_fname, dirty_fname)
-    os.system("rm " + clean_fname)
-    os.system("rm " + dirty_fname)
-    
-    return pesq
+    return pesq_dll.pesq(ctypes.c_void_p(clean_wav.ctypes.data),
+                         ctypes.c_void_p(dirty_wav.ctypes.data),
+                         len(clean_wav),
+                         len(dirty_wav))
 
 # interface to PESQ evaluation, taking in two sets of windows as input
 def run_pesq_windows(clean_wnd, dirty_wnd, wparam1, wparam2):
