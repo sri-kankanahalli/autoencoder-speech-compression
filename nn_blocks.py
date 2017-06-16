@@ -118,7 +118,7 @@ class ChannelResize1D(Layer):
 
 
 # ---------------------------------------------------
-# Residual "block" that makes up all of our models
+# "Blocks" that make up all of our models
 # ---------------------------------------------------
 
 # activation used in all blocks
@@ -128,25 +128,77 @@ def activation(init = 0.3):
     return PReLU(alpha_initializer = Constant(init),
                  shared_axes = [1])
 
-# super advanced residual block, supporting the following additional
-# operations
-#     - upsampling
-#     - downsampling
-#     - channel_change
-# as well as a gating operation and dilated convolutions
-def residual_block(num_chans, filt_size, dilation = 1, gate = False,
+# channel change block: takes input from however many channels
+#                       it had before to [num_chans] channels,
+#                       without applying any other operation
+def channel_change_block(num_chans, filt_size):
+    def f(inp):
+        out = inp
+
+        out = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(out)
+        out = activation(0.3)(out)
+
+        out = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(out)
+        out = activation(0.3)(out)
+
+        return out
+    
+    return f
+
+# upsample block: takes input channels of length N and upsamples
+#                 them to length 2N, using "phase shift" upsampling
+def upsample_block(num_chans, filt_size):
+    def f(inp):
+        out = inp
+
+        out = Conv1D(num_chans * 2, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(out)
+        out = activation(0.3)(out)
+
+        out = Conv1D(num_chans * 2, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(out)
+        out = activation(0.3)(out)
+        out = PhaseShiftUp1D(2)(out)
+
+        return out
+    
+    return f
+
+# downsample block: takes input channels of length N and downsamples
+#                   them to length N/2, using strided convolution
+def downsample_block(num_chans, filt_size):
+    def f(inp):
+        out = inp
+
+        out = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear',
+                     strides = 2)(out)
+        out = activation(0.3)(out)
+
+        out = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear')(out)
+        out = activation(0.3)(out)
+
+        return out
+    
+    return f
+
+# advanced residual block, supporting gating and dilated convolutions
+def residual_block(num_chans, filt_size, dilation = 1, gate = True,
                    operation = 'none'):
     def f(inp):
         # ---------------------------------------
         # shortcut connection
         # ---------------------------------------
         shortcut = inp
-        if (operation == 'upsample'):
-            shortcut = LinearUpSampling1D()(shortcut)
-        elif (operation == 'downsample'):
-            shortcut = AveragePooling1D()(shortcut)
-        elif (operation == 'channel_change'):
-            shortcut = ChannelResize1D(num_chans)(shortcut)
 
         # ---------------------------------------
         # residual operation
@@ -154,30 +206,17 @@ def residual_block(num_chans, filt_size, dilation = 1, gate = False,
         res = inp
 
         # conv1
-        if (operation == 'upsample'):
-            conv1_nc = num_chans * 2
-            conv1_stride = 1
-        elif (operation == 'downsample'):
-            conv1_nc = num_chans
-            conv1_stride = 2
-        else:
-            conv1_nc = num_chans
-            conv1_stride = 1
-
-        res = Conv1D(conv1_nc, filt_size, padding = 'same',
-                     kernel_initializer = W_INIT,
-                     activation = 'linear',
-                     dilation_rate = dilation,
-                     strides = conv1_stride)(res)
-        res = activation(0.3)(res)
-
-        # conv2
-        res = Conv1D(conv1_nc, filt_size, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
                      dilation_rate = dilation)(res)
-        if (operation == 'upsample'):
-            res = PhaseShiftUp1D(2)(res)
+        res = activation(0.3)(res)
+
+        # conv2
+        res = Conv1D(num_chans, filt_size, padding = 'same',
+                     kernel_initializer = W_INIT,
+                     activation = 'linear',
+                     dilation_rate = dilation)(res)
         res = activation(0.3)(res)
 
         if (operation != 'none'):
@@ -187,18 +226,18 @@ def residual_block(num_chans, filt_size, dilation = 1, gate = False,
         # gating (if enabled)
         # ---------------------------------------
         if (gate):
-            shortcut_gate = Conv1D(conv1_nc, 3, padding = 'same',
+            shortcut_gate = Conv1D(num_chans, 3, padding = 'same',
                                    kernel_initializer = W_INIT,
                                    bias_initializer = Constant(3),
                                    activation = 'sigmoid',
-                                   dilation_rate = dilation,
-                                   strides = conv1_stride)(inp)
-            if (operation == 'upsample'):
-                shortcut_gate = PhaseShiftUp1D(2)(shortcut_gate)
+                                   dilation_rate = dilation)(inp)
             shortcut = Multiply()([shortcut, shortcut_gate])
 
-            res_gate = Lambda(lambda x : 1.0 - x,
-                              output_shape = lambda s : s)(shortcut_gate)
+            res_gate = Conv1D(num_chans, 3, padding = 'same',
+                              kernel_initializer = W_INIT,
+                              bias_initializer = Constant(3),
+                              activation = 'sigmoid',
+                              dilation_rate = dilation)(inp)
             res = Multiply()([res, res_gate])
 
         # ---------------------------------------
