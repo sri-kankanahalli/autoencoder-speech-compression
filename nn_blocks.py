@@ -16,6 +16,9 @@ from keras.optimizers import *
 from keras.regularizers import *
 from keras.initializers import *
 
+# weight initialization used in all layers of network
+W_INIT = Orthogonal()
+
 # ---------------------------------------------------
 # 1D "phase shift" upsampling layer, as discussed in [that one
 # superresolution paper]

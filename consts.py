@@ -16,6 +16,3 @@ SAMPLE_RATE = 16000
 # directory that contains TIMIT files
 TIMIT_DIR = "/home/sri/Desktop/timit"
 
-# weight initialization used in all layers of network
-W_INIT = 'he_normal'
-
