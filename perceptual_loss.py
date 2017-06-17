@@ -4,7 +4,8 @@ from numpy.fft import fft, ifft
 from scipy.fftpack import dct, idct
 
 from consts import *
-from utility import *
+from nn_util import *
+from nn_blocks import *
 from keras import backend as K
 
 # ====================================================================
@@ -20,10 +21,10 @@ from keras import backend as K
 def generate_dct_mat(n, norm = 'ortho'):
     return K.variable(dct(np.eye(n), norm = norm))
 
-# given a (symbolic Theano) array of size M x A
+# given a (symbolic Keras) array of size M x A
 #     this returns an array M x A where every one of the M samples has been independently
 #     filtered by the DCT matrix passed in
-def theano_dct(x, dct_mat):
+def keras_dct(x, dct_mat):
     # reshape x into 2D array, and perform appropriate matrix operation
     reshaped_x = K.reshape(x, (-1, dct_mat.shape[0]))
     return K.dot(reshaped_x, dct_mat)
@@ -38,10 +39,10 @@ def generate_dft_mats(n):
     mat = np.fft.fft(np.eye(n))
     return K.variable(np.real(mat)), K.variable(np.imag(mat))
 
-# given a (symbolic Theano) array of size M x WINDOW_SIZE
+# given a (symbolic Keras) array of size M x WINDOW_SIZE
 #     this returns an array M x WINDOW_SIZE where every one of the M samples has been replaced by
 #     its DFT magnitude, using the DFT matrices passed in
-def theano_dft_mag(x, real_mat, imag_mat):
+def keras_dft_mag(x, real_mat, imag_mat):
     reshaped_x = K.reshape(x, (-1, real_mat.shape[0]))
     real = K.dot(reshaped_x, real_mat)
     imag = K.dot(reshaped_x, imag_mat)
@@ -107,10 +108,45 @@ def melFilterBank(numCoeffs):
             filter[j] = 1 - ((float(j) - midRange) / (endRange - midRange))
         
         filterMat[i - 1] = filter
- 
 
     # return filterbank as matrix
     return filterMat
+
+# ====================================================================
+#  Finally: a simple perceptual loss function (based on Mel scale)
+# ====================================================================
+
+NUM_MFCC_COEFFS = 64
+
+# precompute Mel filterbank
+MEL_FILTERBANK_NPY = melFilterBank(NUM_MFCC_COEFFS).transpose()
+MEL_FILTERBANK = K.variable(MEL_FILTERBANK_NPY)
+
+# we precompute matrices for MFCC calculation
+DFT_REAL, DFT_IMAG = generate_dft_mats(WINDOW_SIZE)
+MFCC_DCT = generate_dct_mat(NUM_MFCC_COEFFS)
+
+# given a (symbolic Keras) array of size M x WINDOW_SIZE
+#     this returns an array M x N where each window has been replaced
+#     by some perceptual transform (in this case, MFCC coeffs)
+def perceptual_transform(x):
+    powerSpectrum = K.square(keras_dft_mag(x, DFT_REAL, DFT_IMAG))
+    filteredSpectrum = K.dot(powerSpectrum, MEL_FILTERBANK)
+    logSpectrum = K.log(filteredSpectrum + K.epsilon())
+    
+    mfccs = keras_dct(logSpectrum, MFCC_DCT)[:, 1:-32]
+    return mfccs
+
+# perceptual loss function
+def perceptual_distance(y_true, y_pred):
+    y_true = K.reshape(y_true, (-1, WINDOW_SIZE))
+    y_pred = K.reshape(y_pred, (-1, WINDOW_SIZE))
+    
+    pvec_true = perceptual_transform(y_true)
+    pvec_pred = perceptual_transform(y_pred)
+    
+    return rmse(pvec_true, pvec_pred)
+
 
 
 

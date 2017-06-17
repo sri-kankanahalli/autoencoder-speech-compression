@@ -15,7 +15,6 @@ import random
 from windowing import *
 from consts import *
 
-
 # ---------------------------------------------------
 # directory walk functions
 # ---------------------------------------------------
@@ -27,7 +26,6 @@ def get_wavs_contained(a_dir):
     return [name for name in os.listdir(a_dir)
             if not os.path.isdir(os.path.join(a_dir, name))
                and name.split(".")[-1].lower() == 'wav']
-
 
 # ---------------------------------------------------
 # load info about TIMIT from directory/file structure
@@ -57,7 +55,6 @@ for i in xrange(1, NUM_DIALECTS + 1):
             info[name] = sorted(get_wavs_contained(dir_name + name))
 
         TIMIT[split].append(info)
-
 
 # ---------------------------------------------------
 # create train/test/validation splits on TIMIT
@@ -134,13 +131,12 @@ def timit_train_test_val(num_train, num_val, num_test, val_spkr_pct = 0.25):
     
     return train, val, test
 
-
 # ---------------------------------------------------
 # load raw waveforms from a list
 # ---------------------------------------------------
 def load_raw_waveforms(lst):
     rawData = []
-    i = 0
+    #i = 0
     for filepath in lst:
         [rate, data] = sciwav.read(filepath)
         data = data.astype(np.float64)
@@ -150,11 +146,10 @@ def load_raw_waveforms(lst):
         else:
             rawData += [data]
         
-        print (str(i) + ": " + filepath + "\r"),
-        i += 1
+        #print (str(i) + ": " + filepath + "\r"),
+        #i += 1
     
     return rawData
-
 
 # ---------------------------------------------------
 # waveform preprocessing functions
@@ -169,7 +164,6 @@ def preprocess_waveform(waveform):
 
 def unpreprocess_waveform(waveform, params):
     return np.copy(waveform) * params[0]
-
 
 # ---------------------------------------------------
 # load and process TIMIT data into speech windows

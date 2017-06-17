@@ -1,12 +1,12 @@
 # ==========================================================================
-# neural network Keras blocks / Theano operations needed for models, as well
+# neural network Keras layers / blocks needed for models, as well
 # as a few utility functions
 # ==========================================================================
 
 import numpy as np
 
 from consts import *
-from utility import *
+from nn_util import *
 from keras import backend as K
 from keras.models import *
 from keras.layers import *
@@ -15,6 +15,7 @@ from keras.layers.normalization import *
 from keras.optimizers import *
 from keras.regularizers import *
 from keras.initializers import *
+from keras.activations import softmax
 
 # weight initialization used in all layers of network
 W_INIT = Orthogonal()
@@ -51,6 +52,64 @@ class PhaseShiftUp1D(Layer):
         }
         base_config = super(PhaseShiftUp1D, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+# ---------------------------------------------------
+# Scalar quantization / dequantization layers
+# ---------------------------------------------------
+
+# both layers rely on the shared [QUANT_BINS] variable in consts.py
+
+# quantization: takes in    [BATCH x WINDOW_SIZE]
+#               and returns [BATCH x WINDOW_SIZE x NBINS]
+# where the last dimension is a one-hot vector of bins
+#
+# [bins initialization is in consts.py]
+class SoftmaxQuantization(Layer):
+    def __init__(self, **kwargs):
+        super(SoftmaxQuantization, self).__init__(**kwargs)
+   
+    def build(self, input_shape):
+        self.SOFTMAX_TEMP = K.variable(500.0)
+        self.trainable_weights = [QUANT_BINS,
+                                  self.SOFTMAX_TEMP]
+        super(SoftmaxQuantization, self).build(input_shape)
+        
+    def call(self, x, mask=None):
+        # x is an array: [BATCH x WINDOW_SIZE]
+        # x_r becomes:   [BATCH x WINDOW_SIZE x 1]
+        x_r = K.reshape(x, (-1, x.shape[1], 1))
+
+        # QUANT_BINS is an array: [NBINS]
+        # q_r becomes:    [1 x 1 x NBINS]
+        q_r = K.reshape(QUANT_BINS, (1, 1, NBINS))
+
+        # get L1 distance from each element to each of the bins
+        # dist is: [BATCH x WINDOW_SIZE x NBINS]
+        dist = K.abs(x_r - q_r)
+
+        # turn into softmax probabilities, which we return
+        probs = softmax(self.SOFTMAX_TEMP * -dist)
+        return probs
+    
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[1], NBINS)
+
+# dequantization: takes in    [BATCH x WINDOW_SIZE x NBINS]
+#                 and returns [BATCH x WINDOW_SIZE]
+class SoftmaxDequantization(Layer):
+    def __init__(self, **kwargs):
+        super(SoftmaxDequantization, self).__init__(**kwargs)
+    
+    def build(self, input_shape):
+        super(SoftmaxDequantization, self).build(input_shape)
+    
+    def call(self, x, mask=None):
+        out = K.dot(x, K.expand_dims(QUANT_BINS))
+        out = K.reshape(out, (-1, out.shape[1]))
+        return out
+    
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[1])
 
 # ---------------------------------------------------
 # "Blocks" that make up all of our models
@@ -127,7 +186,7 @@ def downsample_block(num_chans, filt_size):
     return f
 
 # advanced residual block, supporting gating and dilated convolutions
-def residual_block(num_chans, filt_size, dilation = 1, gate = True,
+def residual_block(num_chans, filt_size, dilation = 1, gate = False,
                    operation = 'none'):
     def f(inp):
         # ---------------------------------------
@@ -181,24 +240,6 @@ def residual_block(num_chans, filt_size, dilation = 1, gate = True,
         return Add()([shortcut, res])
     
     return f
-
-
-# ---------------------------------------------------
-# Utility / loss functions
-# ---------------------------------------------------
-
-# NaN-safe RMSE loss function
-def rmse(y_true, y_pred):
-    mse = K.mean(K.square(y_pred - y_true), axis=-1)
-    return K.sqrt(mse + K.epsilon())
-
-# function to freeze weights
-def make_trainable(net, val):
-    net.trainable = val
-    for l in net.layers:
-        l.trainable = val
-        if (l is Model):
-            make_trainable(l, val)
 
 
 

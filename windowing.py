@@ -34,7 +34,6 @@ def extract_windows(data, stepSize, overlapSize):
     
     return windows
 
-
 # reconstruct waveform from overlapping windows
 def reconstruct_from_windows(windows, overlapSize, overlapFunc):
     reconstruction = []
@@ -63,7 +62,6 @@ def reconstruct_from_windows(windows, overlapSize, overlapFunc):
             reconstruction = np.concatenate([reconstruction, unmodifiedPart])
         
     return reconstruction
-
 
 # extract windows for list of waveforms
 def extract_windows_multiple(wavelist, stepSize, overlapSize, collapse = False):
