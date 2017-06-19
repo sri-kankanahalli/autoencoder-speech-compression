@@ -24,7 +24,7 @@ VAL_EVALUATE = 100
 WINDOW_SIZE = 512
 OVERLAP_SIZE = 32
 STEP_SIZE = WINDOW_SIZE - OVERLAP_SIZE
-OVERLAP_FUNC = sig.triang(OVERLAP_SIZE * 2)
+OVERLAP_FUNC = sig.hann(OVERLAP_SIZE * 2)
 
 # sample rate of input files
 SAMPLE_RATE = 16000
@@ -36,5 +36,12 @@ TIMIT_DIR = "/home/sri/Desktop/timit"
 NBINS = 32
 BINS_INIT = np.linspace(-1.0, 1.0, NBINS)
 QUANT_BINS = K.variable(BINS_INIT, name = 'QUANT_BINS')
+
+# quantization is initially turned off
+QUANTIZATION_ON = K.variable(False, name = 'QUANTIZATION_ON')
+
+# adaptive quantization parameters
+ADAPT_STEP = 32
+CHANGE_SCALES = K.variable(np.ones((NBINS,)))
 
 

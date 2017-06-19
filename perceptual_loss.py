@@ -134,6 +134,7 @@ def perceptual_transform(x):
     filteredSpectrum = K.dot(powerSpectrum, MEL_FILTERBANK)
     logSpectrum = K.log(filteredSpectrum + K.epsilon())
     
+    #return logSpectrum
     mfccs = keras_dct(logSpectrum, MFCC_DCT)[:, 1:-32]
     return mfccs
 

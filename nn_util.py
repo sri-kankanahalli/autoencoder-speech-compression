@@ -5,6 +5,8 @@ import numpy as np
 import h5py
 import os
 
+from consts import *
+
 # hackily patches a really stupid TensorFlow bug affecting K.reshape
 import tensorflow as tf
 from keras import backend as K
