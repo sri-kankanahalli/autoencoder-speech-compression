@@ -67,7 +67,7 @@ class PhaseShiftUp1D(Layer):
 class SoftmaxQuantization(Layer):
     def __init__(self, **kwargs):
         super(SoftmaxQuantization, self).__init__(**kwargs)
-   
+
     def build(self, input_shape):
         self.SOFTMAX_TEMP = K.variable(500.0)
         self.trainable_weights = [QUANT_BINS,
@@ -81,7 +81,7 @@ class SoftmaxQuantization(Layer):
 
         # QUANT_BINS is an array: [NBINS]
         # q_r becomes:    [1 x 1 x NBINS]
-        q_r = K.reshape(QUANT_BINS, (1, 1, NBINS))
+        q_r = K.reshape(QUANT_BINS, (1, 1, -1))
 
         # get L1 distance from each element to each of the bins
         # dist is: [BATCH x WINDOW_SIZE x NBINS]
@@ -108,151 +108,10 @@ class SoftmaxDequantization(Layer):
     
     def build(self, input_shape):
         super(SoftmaxDequantization, self).build(input_shape)
-    
+
     def call(self, x, mask=None):
         dec = K.dot(x, K.expand_dims(QUANT_BINS))
         dec = K.reshape(dec, (-1, dec.shape[1]))
-
-        quant_on = dec
-        quant_off = K.reshape(x[:, :, :1], (-1, x.shape[1]))
-        return K.switch(QUANTIZATION_ON, quant_on, quant_off)
-    
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1])
-
-# ---------------------------------------------------
-# ADAPTIVE scalar quantization / dequantization layers
-# ---------------------------------------------------
-
-# in addition to [QUANT_BINS] these layers rely on [CHANGE_SCALES]
-
-# quantization: takes in    [BATCH x WINDOW_SIZE]
-#               and returns [BATCH x WINDOW_SIZE x NBINS]
-# where the last dimension is a one-hot vector of bins
-#
-# [bins initialization is in consts.py]
-class AdaptiveQuantization(Layer):
-    def build(self, input_shape):
-        self.SOFTMAX_TEMP = K.variable(500.0, name = 'softmax_temp')
-        self.trainable_weights = [QUANT_BINS,
-                                  CHANGE_SCALES,
-                                  self.SOFTMAX_TEMP]
-        super(AdaptiveQuantization, self).build(input_shape)
-    
-    # x is a vector: [BATCH_SIZE x ADAPT_STEP]
-    # curr_bins is a vector: [BATCH_SIZE x NBINS]
-    def step(self, x, curr_bins):
-        # --- compute output ---
-        # x_r becomes: [BATCH_SIZE x ADAPT_STEP x 1]
-        x_r = K.expand_dims(x, -1)
-
-        # c_r becomes: [BATCH_SIZE x 1 x NBINS]
-        c_r = K.expand_dims(curr_bins, -2)
-
-        # get L1 distance from each element to each of the bins
-        # dist is: [BATCH_SIZE x ADAPT_STEP x NBINS]
-        dist = K.abs(x_r - c_r)
-
-        # turn into softmax probabilities, which we return
-        # probs is: [BATCH_SIZE x ADAPT_STEP x NBINS]
-        probs = softmax(self.SOFTMAX_TEMP * -dist)
-
-        # --- update bins ---
-        # symbol_probs is: [BATCH_SIZE x NBINS]
-        symbol_probs = K.sum(probs, axis = 1) / ADAPT_STEP
-        
-        # curr_change_scale is: [BATCH_SIZE x 1]
-        curr_change_scale = K.dot(symbol_probs, K.expand_dims(CHANGE_SCALES))
-
-        # bins_res is: [BATCH_SIZE x NBINS x 1], then [BATCH_SIZE x NBINS]
-        bins_res = K.batch_dot(K.expand_dims(curr_bins), K.expand_dims(curr_change_scale))
-        bins_res = K.squeeze(bins_res, -1)
-
-        # new_bins is: [BATCH_SIZE x NBINS]
-        new_bins = curr_bins + bins_res
-
-        # --- return output & new bins ---
-        return probs, new_bins
-    
-    def call(self, x, mask = None):
-        # a really contrived way to repeat QUANT_BINS into a vector
-        #     BATCH_SIZE x NBINS
-        # because Keras's TF backend doesn't support tensor arguments for
-        # repeat_elements
-        curr_bins = K.expand_dims(QUANT_BINS, 0)
-        tile_amt = [tf.shape(x)[0]]
-        tile_amt = tf.concat([tile_amt, tf.ones((1,), dtype = tf.int32)], axis = 0)
-        curr_bins = tf.tile(curr_bins, tile_amt)
-        
-        # out becomes: list of length [WINDOW_SIZE / ADAPT_STEP]
-        #                  of BATCH_SIZE x ADAPT_STEP x NBINS length testors
-        mod_x = K.reshape(x, (-1, x.shape[1] / ADAPT_STEP, ADAPT_STEP))
-        mod_x = tf.unstack(tf.transpose(mod_x, [1, 0, 2]))
-        out = []
-        for i in mod_x:
-            w, new_bins = self.step(i, curr_bins)
-            curr_bins = new_bins
-            out.append(w)
-        
-        # we finagle this into: [BATCH_SIZE x WINDOW_SIZE x NBINS]
-        enc = tf.transpose(tf.stack(out), [1, 0, 2, 3])
-        enc = K.reshape(enc, (-1, enc.shape[1] * enc.shape[2], NBINS))
-
-        quant_on = enc
-        quant_off = K.zeros_like(enc)[:, :, 1:]
-        quant_off = K.concatenate([K.reshape(x, (-1, x.shape[1], 1)),
-                                   quant_off], axis = 2)
-        
-        return K.switch(QUANTIZATION_ON, quant_on, quant_off)
-    
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1], NBINS)
-
-# dequantization: takes in    [BATCH x WINDOW_SIZE x NBINS]
-#                 and returns [BATCH x WINDOW_SIZE]
-class AdaptiveDequantization(Layer):
-    # x is a vector of size [BATCH_SIZE x ADAPT_STEP x NBINS] -- 1 time step
-    # curr_bins is a vector [BATCH_SIZE x NBINS]
-    def step(self, x, curr_bins):
-        # --- compute output ---
-        out = K.batch_dot(x, K.expand_dims(curr_bins, 2))
-        out = K.squeeze(out, -1)
-        
-        # --- update bins ---
-        # symbol_probs is: [BATCH_SIZE x NBINS]
-        symbol_probs = K.sum(x, axis = 1) / ADAPT_STEP
-        
-        # curr_change_scale is: [BATCH_SIZE x 1]
-        curr_change_scale = K.dot(symbol_probs, K.expand_dims(CHANGE_SCALES))
-
-        # bins_res is: [BATCH_SIZE x NBINS x 1], then [BATCH_SIZE x NBINS]
-        bins_res = K.batch_dot(K.expand_dims(curr_bins), K.expand_dims(curr_change_scale))
-        bins_res = K.squeeze(bins_res, -1)
-
-        # new_bins is: [BATCH_SIZE x NBINS]
-        new_bins = curr_bins + bins_res
-        
-        # --- return output & new bins ---
-        return out, new_bins
-        
-    def call(self, x, mask=None):
-        nbatch = K.int_shape(x)[0]
-        
-        curr_bins = K.expand_dims(QUANT_BINS, 0)
-        tile_amt = [tf.shape(x)[0]]
-        tile_amt = tf.concat([tile_amt, tf.ones((1,), dtype = tf.int32)], axis = 0)
-        curr_bins = tf.tile(curr_bins, tile_amt)
-        
-        mod_x = K.reshape(x, (-1, x.shape[1] / ADAPT_STEP, ADAPT_STEP, x.shape[2]))
-        mod_x = tf.unstack(tf.transpose(mod_x, [1, 0, 2, 3]))
-        out = []
-        for i in mod_x:
-            w, new_bins = self.step(i, curr_bins)
-            curr_bins = new_bins
-            out.append(w)
-            
-        dec = tf.transpose(tf.stack(out), [1, 0, 2])
-        dec = K.reshape(dec, (-1, dec.shape[1] * ADAPT_STEP))
 
         quant_on = dec
         quant_off = K.reshape(x[:, :, :1], (-1, x.shape[1]))
