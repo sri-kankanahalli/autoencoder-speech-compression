@@ -18,7 +18,7 @@ from keras.initializers import *
 from keras.activations import softmax
 
 # weight initialization used in all layers of network
-W_INIT = 'he_normal'
+W_INIT = 'he_uniform'
 
 # ---------------------------------------------------
 # 1D "phase shift" upsampling layer, as discussed in [that one

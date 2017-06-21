@@ -10,8 +10,8 @@ from keras.regularizers import *
 from keras.initializers import *
 from keras.activations import softmax
 
-ADAPT_STEP = 32
-CHANGE_SCALES = K.variable(np.random.uniform(0.9, 1.1, (NBINS, 1)))
+ADAPT_STEP = 16
+#CHANGE_SCALES = K.variable(np.random.uniform(0.9, 1.1, (NBINS, 1)))
 
 # quantization: takes in    [BATCH x WINDOW_SIZE]
 #               and returns [BATCH x WINDOW_SIZE x NBINS]
@@ -20,9 +20,9 @@ CHANGE_SCALES = K.variable(np.random.uniform(0.9, 1.1, (NBINS, 1)))
 # [bins initialization is in consts.py]
 class DeltaQuantization(Layer):
     def build(self, input_shape):
-        self.SOFTMAX_TEMP = K.variable(500.0, name = 'softmax_temp')
+        self.SOFTMAX_TEMP = K.variable(300.0, name = 'softmax_temp')
         self.trainable_weights = [QUANT_BINS,
-                                  CHANGE_SCALES,
+                                  #CHANGE_SCALES,
                                   self.SOFTMAX_TEMP]
         super(DeltaQuantization, self).build(input_shape)
     
@@ -58,15 +58,16 @@ class DeltaQuantization(Layer):
         # FINALLY: update bins
 
         # symbol_probs is: [BATCH_SIZE x NBINS]
-        symbol_probs = K.sum(quant, axis = 1) / ADAPT_STEP
+        #symbol_probs = K.sum(quant, axis = 1) / ADAPT_STEP
                
         # curr_change_scale is: [BATCH_SIZE x 1]
-        curr_change_scale = K.dot(symbol_probs, CHANGE_SCALES)
+        #curr_change_scale = K.dot(symbol_probs, CHANGE_SCALES)
         
         # new_bins is: [BATCH_SIZE x NBINS x 1], then [BATCH_SIZE x NBINS]
-        new_bins = K.batch_dot(K.expand_dims(curr_bins), K.expand_dims(curr_change_scale))
-        new_bins = K.squeeze(new_bins, -1)
-        
+        #new_bins = K.batch_dot(K.expand_dims(curr_bins), K.expand_dims(curr_change_scale))
+        #new_bins = K.squeeze(new_bins, -1)
+        new_bins = curr_bins        
+
         return quant, new_pred, new_bins
     
     def call(self, x, mask = None):
@@ -91,7 +92,12 @@ class DeltaQuantization(Layer):
         # we finagle this into: [BATCH_SIZE x WINDOW_SIZE x NBINS]
         enc = tf.transpose(tf.stack(out), [1, 0, 2, 3])
         enc = K.reshape(enc, (-1, enc.shape[1] * enc.shape[2], NBINS))
-        return enc
+
+        quant_on = enc
+        quant_off = K.zeros_like(enc)[:, :, 1:]
+        quant_off = K.concatenate([K.reshape(x, (-1, x.shape[1], 1)),
+                                   quant_off], axis = 2)
+        return K.switch(QUANTIZATION_ON, quant_on, quant_off)
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1], NBINS)
@@ -115,15 +121,16 @@ class DeltaDequantization(Layer):
         # FINALLY: update bins
 
         # symbol_probs is: [BATCH_SIZE x NBINS]
-        symbol_probs = K.sum(quant, axis = 1) / ADAPT_STEP
+        #symbol_probs = K.sum(quant, axis = 1) / ADAPT_STEP
         
         # curr_change_scale is: [BATCH_SIZE x 1]
-        curr_change_scale = K.dot(symbol_probs, CHANGE_SCALES)
+        #curr_change_scale = K.dot(symbol_probs, CHANGE_SCALES)
         
         # new_bins is: [BATCH_SIZE x NBINS x 1], then [BATCH_SIZE x NBINS]
-        new_bins = K.batch_dot(K.expand_dims(curr_bins), K.expand_dims(curr_change_scale))
-        new_bins = K.squeeze(new_bins, -1)
-        
+        #new_bins = K.batch_dot(K.expand_dims(curr_bins), K.expand_dims(curr_change_scale))
+        #new_bins = K.squeeze(new_bins, -1)
+        new_bins = curr_bins        
+
         return out, new_pred, new_bins
         
     def call(self, x, mask=None):
@@ -145,7 +152,10 @@ class DeltaDequantization(Layer):
             
         dec = tf.transpose(tf.stack(out), [1, 0, 2])
         dec = K.reshape(dec, (-1, dec.shape[1] * ADAPT_STEP))
-        return dec
+
+        quant_on = dec
+        quant_off = K.reshape(x[:, :, :1], (-1, x.shape[1]))
+        return K.switch(QUANTIZATION_ON, quant_on, quant_off)
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1])

@@ -33,7 +33,7 @@ SAMPLE_RATE = 16000
 TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # number of quantization bins, as well as initialization
-NBINS = 32
+NBINS = 31
 BINS_INIT = np.linspace(-1.0, 1.0, NBINS)
 QUANT_BINS = K.variable(BINS_INIT, name = 'QUANT_BINS')
 
