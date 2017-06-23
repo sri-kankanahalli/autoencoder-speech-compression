@@ -1,0 +1,14 @@
+gating: none
+perceptual loss: combination of mfccs [8, 16, 32, 64, 128]
+32 channels, filter size 9
+32 bins, vec size 1, downsample factor 2
+trained for 300 epochs
+# params: 407,295 (182,576 encoder; 224,719 decoder)
+minimum tau: 0.5
+cosine annealing, initial LR 0.0005, final LR 0.0001
+
+architecture:
+    chng(NCHAN) => res(1) => res(2) => res(4) => res(8) => down =>
+                   res(1) => res(2) => res(4) => res(8) => chng(1)
+    chng(NCHAN) => res(8) => res(4) => res(2) => res(1) =>  up  =>
+                   res(8) => res(4) => res(2) => res(1) => chng(1)

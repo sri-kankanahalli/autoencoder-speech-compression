@@ -30,6 +30,9 @@ def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     enc = autoencoder.layers[1]
     
     embed = enc.predict(transformed, batch_size = 128, verbose = 0)
+    if (type(embed) is list or type(embed) is tuple):
+        embed = embed[0]
+
     if (argmax):
         for wnd in xrange(0, embed.shape[0]):
             max_idxs = np.argmax(embed[wnd], axis = -1)

@@ -19,7 +19,7 @@ from keras import backend as K
 #
 #     backed by scipy
 def generate_dct_mat(n, norm = 'ortho'):
-    return K.variable(dct(np.eye(n), norm = norm))
+    return K.constant(dct(np.eye(n), norm = norm))
 
 # given a (symbolic Keras) array of size M x A
 #     this returns an array M x A where every one of the M samples has been independently
@@ -35,9 +35,17 @@ def keras_dct(x, dct_mat):
 
 # generate two square DFT matrices, one for the real component, one for
 # the imaginary component
+#     dimensions are: n x n
 def generate_dft_mats(n):
     mat = np.fft.fft(np.eye(n))
-    return K.variable(np.real(mat)), K.variable(np.imag(mat))
+    return K.constant(np.real(mat)), K.variable(np.imag(mat))
+
+# generate two NON-square DFT matrices, one for the real component, one for
+# the imaginary component, using np.fft.rfft
+#     dimensions are: n x (fft_size / 2 + 1)
+def generate_real_dft_mats(n, fft_size):
+    mat = np.fft.rfft(np.eye(n), fft_size)
+    return K.constant(np.real(mat)), K.variable(np.imag(mat))
 
 # given a (symbolic Keras) array of size M x WINDOW_SIZE
 #     this returns an array M x WINDOW_SIZE where every one of the M samples has been replaced by
@@ -69,10 +77,13 @@ def melToFreq(mel):
     return 700 * (math.exp(mel / 1127.01048) - 1)
 
 # generate Mel filter bank
-def melFilterBank(numCoeffs):
+def melFilterBank(numCoeffs, fftSize = None):
     minHz = 0
     maxHz = SAMPLE_RATE / 2            # max Hz by Nyquist theorem
-    numFFTBins = WINDOW_SIZE
+    if (fftSize is None):
+        numFFTBins = WINDOW_SIZE
+    else:
+        numFFTBins = fftSize / 2 + 1
 
     maxMel = freqToMel(maxHz)
     minMel = freqToMel(minHz)
@@ -113,31 +124,38 @@ def melFilterBank(numCoeffs):
     return filterMat
 
 # ====================================================================
-#  Finally: a simple perceptual loss function (based on Mel scale)
+#  Finally: a perceptual loss function (based on Mel scale)
 # ====================================================================
 
-NUM_MFCC_COEFFS = 64
+FFT_SIZE = 512
 
-# precompute Mel filterbank
-MEL_FILTERBANK_NPY = melFilterBank(NUM_MFCC_COEFFS).transpose()
-MEL_FILTERBANK = K.variable(MEL_FILTERBANK_NPY)
+# multi-scale MFCC distance
+MEL_SCALES = [8, 16, 32, 64, 128]
 
+# precompute Mel filterbank: [FFT_SIZE x NUM_MFCC_COEFFS]
+MEL_FILTERBANKS = []
+for scale in MEL_SCALES:
+    filterbank_npy = melFilterBank(scale, FFT_SIZE).transpose()
+    MEL_FILTERBANKS.append(K.constant(filterbank_npy))
+    
 # we precompute matrices for MFCC calculation
-DFT_REAL, DFT_IMAG = generate_dft_mats(WINDOW_SIZE)
-MFCC_DCT = generate_dct_mat(NUM_MFCC_COEFFS)
+DFT_REAL, DFT_IMAG = generate_real_dft_mats(WINDOW_SIZE, FFT_SIZE)
 
-# given a (symbolic Keras) array of size M x WINDOW_SIZE
+# given a (symbolic Theano) array of size M x WINDOW_SIZE
 #     this returns an array M x N where each window has been replaced
 #     by some perceptual transform (in this case, MFCC coeffs)
 def perceptual_transform(x):
     powerSpectrum = K.square(keras_dft_mag(x, DFT_REAL, DFT_IMAG))
-    filteredSpectrum = K.dot(powerSpectrum, MEL_FILTERBANK)
-    logSpectrum = K.log(filteredSpectrum + K.epsilon())
+    powerSpectrum = 1.0 / FFT_SIZE * powerSpectrum
     
-    #return logSpectrum
-    mfccs = keras_dct(logSpectrum, MFCC_DCT)[:, 1:-32]
-    return mfccs
+    logMelTransforms = []
+    for filterbank in MEL_FILTERBANKS:
+        filteredSpectrum = K.dot(powerSpectrum, filterbank)
+        logSpectrum = K.log(filteredSpectrum + K.epsilon())
+        logMelTransforms.append(logSpectrum)
 
+    return logMelTransforms
+    
 # perceptual loss function
 def perceptual_distance(y_true, y_pred):
     y_true = K.reshape(y_true, (-1, WINDOW_SIZE))
@@ -146,9 +164,14 @@ def perceptual_distance(y_true, y_pred):
     pvec_true = perceptual_transform(y_true)
     pvec_pred = perceptual_transform(y_pred)
     
-    return rmse(pvec_true, pvec_pred)
+    distances = []
+    for i in xrange(0, len(MEL_SCALES)):
+        error = K.expand_dims(rmse(pvec_pred[i], pvec_true[i]))
+        distances.append(error)
+    distances = K.concatenate(distances, axis = -1)
 
-
+    loss = K.mean(distances, axis = -1)   
+    return loss
 
 
 

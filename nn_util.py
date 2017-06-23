@@ -41,3 +41,11 @@ def make_trainable(net, val):
         if (l is Model):
             make_trainable(l, val)
 
+# given an [array] of scalar quantization bins, finds the
+# closest one to [value]
+def find_nearest(array, value):
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+
+

@@ -18,7 +18,7 @@ from keras.initializers import *
 from keras.activations import softmax
 
 # weight initialization used in all layers of network
-W_INIT = 'he_uniform'
+W_INIT = 'he_normal'
 
 # ---------------------------------------------------
 # 1D "phase shift" upsampling layer, as discussed in [that one
@@ -65,9 +65,6 @@ class PhaseShiftUp1D(Layer):
 #
 # [bins initialization is in consts.py]
 class SoftmaxQuantization(Layer):
-    def __init__(self, **kwargs):
-        super(SoftmaxQuantization, self).__init__(**kwargs)
-
     def build(self, input_shape):
         self.SOFTMAX_TEMP = K.variable(500.0)
         self.trainable_weights = [QUANT_BINS,
@@ -103,12 +100,6 @@ class SoftmaxQuantization(Layer):
 # dequantization: takes in    [BATCH x WINDOW_SIZE x NBINS]
 #                 and returns [BATCH x WINDOW_SIZE]
 class SoftmaxDequantization(Layer):
-    def __init__(self, **kwargs):
-        super(SoftmaxDequantization, self).__init__(**kwargs)
-    
-    def build(self, input_shape):
-        super(SoftmaxDequantization, self).build(input_shape)
-
     def call(self, x, mask=None):
         dec = K.dot(x, K.expand_dims(QUANT_BINS))
         dec = K.reshape(dec, (-1, dec.shape[1]))
@@ -199,6 +190,11 @@ def activation(init = 0.3):
 #                       without applying any other operation
 def channel_change_block(num_chans, filt_size):
     def f(inp):
+        shortcut = Conv1D(num_chans, 5, padding = 'same',
+                          kernel_initializer = W_INIT,
+                          activation = 'linear')(inp)
+        shortcut = activation(0.3)(shortcut)
+
         out = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(inp)
@@ -209,7 +205,7 @@ def channel_change_block(num_chans, filt_size):
                      activation = 'linear')(out)
         out = activation(0.3)(out)
 
-        out = Add()([out, ChannelResize1D(num_chans)(inp)])
+        out = Add()([out, shortcut])
 
         return out
     
@@ -219,6 +215,12 @@ def channel_change_block(num_chans, filt_size):
 #                 them to length 2N, using "phase shift" upsampling
 def upsample_block(num_chans, filt_size):
     def f(inp):
+        shortcut = Conv1D(num_chans * 2, 5, padding = 'same',
+                          kernel_initializer = W_INIT,
+                          activation = 'linear')(inp)
+        shortcut = activation(0.3)(shortcut)
+        shortcut = PhaseShiftUp1D(2)(shortcut)
+
         out = Conv1D(num_chans * 2, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(inp)
@@ -230,7 +232,7 @@ def upsample_block(num_chans, filt_size):
         out = activation(0.3)(out)
         out = PhaseShiftUp1D(2)(out)
 
-        out = Add()([out, LinearUpSampling1D()(inp)])
+        out = Add()([out, shortcut])
 
         return out
     
@@ -240,6 +242,12 @@ def upsample_block(num_chans, filt_size):
 #                   them to length N/2, using strided convolution
 def downsample_block(num_chans, filt_size):
     def f(inp):
+        shortcut = Conv1D(num_chans, 5, padding = 'same',
+                          kernel_initializer = W_INIT,
+                          activation = 'linear',
+                          strides = 2)(inp)
+        shortcut = activation(0.3)(shortcut)
+
         out = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
@@ -251,7 +259,7 @@ def downsample_block(num_chans, filt_size):
                      activation = 'linear')(out)
         out = activation(0.3)(out)
 
-        out = Add()([out, AveragePooling1D()(inp)])
+        out = Add()([out, shortcut])
 
         return out
     
@@ -260,6 +268,8 @@ def downsample_block(num_chans, filt_size):
 # residual block
 def residual_block(num_chans, filt_size, dilation = 1):
     def f(inp):
+        shortcut = inp
+
         # conv1
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
@@ -274,7 +284,7 @@ def residual_block(num_chans, filt_size, dilation = 1):
                      dilation_rate = dilation)(res)
         res = activation(0.3)(res)
 
-        return Add()([res, inp])
+        return Add()([res, shortcut])
     
     return f
 
