@@ -38,7 +38,7 @@ def make_trainable(net, val):
     net.trainable = val
     for l in net.layers:
         l.trainable = val
-        if (l is Model):
+        if (type(l) is Model):
             make_trainable(l, val)
 
 # given an [array] of scalar quantization bins, finds the

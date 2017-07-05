@@ -34,7 +34,9 @@ TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # number of quantization bins, as well as initialization
 NBINS = 32
-BINS_INIT = np.linspace(-1.0, 1.0, NBINS)
+QUANT_CHANS = 1
+BINS_INIT = np.tile(np.linspace(-1.0, 1.0, NBINS), (QUANT_CHANS, 1))
+
 QUANT_BINS = K.variable(BINS_INIT, name = 'QUANT_BINS')
 
 # quantization is initially turned off

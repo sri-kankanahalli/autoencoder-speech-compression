@@ -130,7 +130,7 @@ def melFilterBank(numCoeffs, fftSize = None):
 FFT_SIZE = 512
 
 # multi-scale MFCC distance
-MEL_SCALES = [8, 16, 32, 64, 128]
+MEL_SCALES = [8, 16, 32, 128]
 
 # precompute Mel filterbank: [FFT_SIZE x NUM_MFCC_COEFFS]
 MEL_FILTERBANKS = []
@@ -145,16 +145,16 @@ DFT_REAL, DFT_IMAG = generate_real_dft_mats(WINDOW_SIZE, FFT_SIZE)
 #     this returns an array M x N where each window has been replaced
 #     by some perceptual transform (in this case, MFCC coeffs)
 def perceptual_transform(x):
+    transforms = []
     powerSpectrum = K.square(keras_dft_mag(x, DFT_REAL, DFT_IMAG))
     powerSpectrum = 1.0 / FFT_SIZE * powerSpectrum
-    
-    logMelTransforms = []
+
     for filterbank in MEL_FILTERBANKS:
         filteredSpectrum = K.dot(powerSpectrum, filterbank)
-        logSpectrum = K.log(filteredSpectrum + K.epsilon())
-        logMelTransforms.append(logSpectrum)
+        filteredSpectrum = K.log(filteredSpectrum + K.epsilon())
+        transforms.append(filteredSpectrum)
 
-    return logMelTransforms
+    return transforms
     
 # perceptual loss function
 def perceptual_distance(y_true, y_pred):
@@ -163,9 +163,9 @@ def perceptual_distance(y_true, y_pred):
     
     pvec_true = perceptual_transform(y_true)
     pvec_pred = perceptual_transform(y_pred)
-    
+
     distances = []
-    for i in xrange(0, len(MEL_SCALES)):
+    for i in xrange(0, len(pvec_true)):
         error = K.expand_dims(rmse(pvec_pred[i], pvec_true[i]))
         distances.append(error)
     distances = K.concatenate(distances, axis = -1)
