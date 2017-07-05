@@ -1,6 +1,5 @@
 # ==========================================================================
-# neural network Keras layers / blocks needed for models, as well
-# as a few utility functions
+# neural network Keras layers / blocks / loss functions needed for model
 # ==========================================================================
 
 import numpy as np
@@ -227,6 +226,56 @@ def residual_block(num_chans, filt_size, dilation = 1):
         return Add()([res, shortcut])
     
     return f
+
+
+# ---------------------------------------------------
+# Loss functions
+# ---------------------------------------------------
+
+# entropy weight variable
+tau = K.variable(0.0001, name = "entropy_weight")
+
+def code_entropy(placeholder, code):
+    # [BATCH_SIZE x QUANT_CHAN x NBINS]
+    #     => [QUANT_CHANS x NBINS]
+    # probability distribution over symbols for each channel
+    all_onehots = K.reshape(code, (-1, QUANT_CHANS, NBINS))
+    onehot_hist = K.sum(all_onehots, axis = 0)
+    onehot_hist /= K.sum(onehot_hist, axis = 1, keepdims = True)
+
+    # entropy for each channel
+    channel_entropy = -K.sum(onehot_hist * K.log(onehot_hist + K.epsilon()) / K.log(2.0),
+                             axis = 1)
+
+    # total entropy
+    entropy = K.sum(channel_entropy)
+    
+    loss = tau * entropy
+    return K.switch(QUANTIZATION_ON, loss, K.zeros_like(loss))
+
+def code_sparsity(placeholder, code):
+    # [BATCH_SIZE x CHANNEL_SIZE x QUANT_CHANS x NBINS]
+    #     => [BATCH_SIZE x CHANNEL_SIZE x QUANT_CHANS]
+    square_sum = K.sum(K.sqrt(code + K.epsilon()), axis = -1) - 1.0
+    
+    # take sum over channels, mean over sum
+    sparsity = K.mean(K.sum(square_sum, axis = -1), axis = -1)
+    return K.switch(QUANTIZATION_ON, sparsity, K.zeros_like(sparsity))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,5 +1,5 @@
 # ==========================================================================
-# neural network Keras utility / loss functions
+# neural network Keras utility functions
 # ==========================================================================
 import numpy as np
 import h5py
@@ -14,6 +14,7 @@ def new_reshape(x, shape):
     return tf.reshape(x, fixed_shape)
 
 K.reshape = new_reshape
+from keras.models import Model
 
 # quantization utility functions
 def unquantize_batch(one_hot):
@@ -46,6 +47,21 @@ def make_trainable(net, val):
 def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
     return array[idx]
+
+# interleave numpy arrays of the same size along the first axis
+def interleave(arr):    
+    num = len(arr)
+    
+    r = np.empty(arr[0].shape)
+    r = np.repeat(r, num, axis = 0)
+    
+    for i in xrange(0, num):
+        r[i::num] = arr[i]
+    
+    return r
+
+
+
 
 
 
