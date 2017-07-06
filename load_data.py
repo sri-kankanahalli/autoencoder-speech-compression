@@ -139,7 +139,7 @@ def load_raw_waveforms(lst):
     #i = 0
     for filepath in lst:
         [rate, data] = sciwav.read(filepath)
-        data = data.astype(np.float64)
+        data = data.astype(np.float32)
 
         if (rawData == []):
             rawData = [data]
@@ -204,11 +204,14 @@ def load_data(num_train, num_val, num_test,
 
     # turn each waveform into a corresponding list of windows
     train_windows = extract_windows_multiple(train_procwave, STEP_SIZE,
-                                             OVERLAP_SIZE, collapse = False)
+                                             OVERLAP_SIZE, WINDOWING_MULT,
+                                             collapse = False)
     val_windows = extract_windows_multiple(val_procwave, STEP_SIZE,
-                                           OVERLAP_SIZE, collapse = False)
+                                           OVERLAP_SIZE, WINDOWING_MULT,
+                                           collapse = False)
     test_windows = extract_windows_multiple(test_procwave, STEP_SIZE,
-                                            OVERLAP_SIZE, collapse = False)
+                                            OVERLAP_SIZE, WINDOWING_MULT,
+                                            collapse = False)
 
     # construct return values
     paths = [train_paths, val_paths, test_paths]

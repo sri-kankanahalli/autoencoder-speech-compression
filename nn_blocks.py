@@ -152,24 +152,24 @@ def channel_change_block(num_chans, filt_size):
 
 # upsample block: takes input channels of length N and upsamples
 #                 them to length 2N, using "phase shift" upsampling
-def upsample_block(num_chans, filt_size):
+def upsample_block(num_chans, filt_size, amt = 2):
     def f(inp):
-        shortcut = Conv1D(num_chans * 2, filt_size, padding = 'same',
+        shortcut = Conv1D(num_chans * amt, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
                           activation = 'linear')(inp)
         shortcut = activation(0.3)(shortcut)
-        shortcut = PhaseShiftUp1D(2)(shortcut)
+        shortcut = PhaseShiftUp1D(amt)(shortcut)
 
-        out = Conv1D(num_chans * 2, filt_size, padding = 'same',
+        out = Conv1D(num_chans * amt, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(inp)
         out = activation(0.3)(out)
 
-        out = Conv1D(num_chans * 2, filt_size, padding = 'same',
+        out = Conv1D(num_chans * amt, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(out)
         out = activation(0.3)(out)
-        out = PhaseShiftUp1D(2)(out)
+        out = PhaseShiftUp1D(amt)(out)
 
         out = Add()([out, shortcut])
 
@@ -179,18 +179,18 @@ def upsample_block(num_chans, filt_size):
 
 # downsample block: takes input channels of length N and downsamples
 #                   them to length N/2, using strided convolution
-def downsample_block(num_chans, filt_size):
+def downsample_block(num_chans, filt_size, amt = 2):
     def f(inp):
         shortcut = Conv1D(num_chans, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
                           activation = 'linear',
-                          strides = 2)(inp)
+                          strides = amt)(inp)
         shortcut = activation(0.3)(shortcut)
 
         out = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
-                     strides = 2)(inp)
+                     strides = amt)(inp)
         out = activation(0.3)(out)
 
         out = Conv1D(num_chans, filt_size, padding = 'same',
