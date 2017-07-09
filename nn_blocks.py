@@ -85,10 +85,9 @@ class SoftmaxQuantization(Layer):
         # turn into softmax probabilities, which we return
         enc = softmax(self.SOFTMAX_TEMP * -dist)
         
-        # quantized version
-        #quantized = K.one_hot(K.argmax(enc), NBINS)
-        
-        quant_on = enc# + K.stop_gradient(quantized - enc)
+        # if quantization is OFF, we just pass the input through unchanged
+        # in a hack-y way
+        quant_on = enc
         quant_off = K.reshape(x, (-1, x.shape[1], x.shape[2], 1))
         quant_off = K.concatenate([quant_off,
                                    K.zeros_like(enc)[:, :, :, 1:]], axis = 3)
@@ -122,7 +121,6 @@ def activation(init = 0.3):
     # so we share axis 1
     return PReLU(alpha_initializer = Constant(init),
                  shared_axes = [1])
-    #return LeakyReLU(init)
 
 # channel change block: takes input from however many channels
 #                       it had before to [num_chans] channels,
@@ -151,7 +149,7 @@ def channel_change_block(num_chans, filt_size):
     return f
 
 # upsample block: takes input channels of length N and upsamples
-#                 them to length 2N, using "phase shift" upsampling
+#                 them to length amt * N, using "phase shift" upsampling
 def upsample_block(num_chans, filt_size, amt = 2):
     def f(inp):
         shortcut = Conv1D(num_chans * amt, filt_size, padding = 'same',
@@ -164,13 +162,13 @@ def upsample_block(num_chans, filt_size, amt = 2):
                      kernel_initializer = W_INIT,
                      activation = 'linear')(inp)
         out = activation(0.3)(out)
+        out = PhaseShiftUp1D(amt)(out)
 
-        out = Conv1D(num_chans * amt, filt_size, padding = 'same',
+        out = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(out)
         out = activation(0.3)(out)
-        out = PhaseShiftUp1D(amt)(out)
-
+        
         out = Add()([out, shortcut])
 
         return out
@@ -178,7 +176,7 @@ def upsample_block(num_chans, filt_size, amt = 2):
     return f
 
 # downsample block: takes input channels of length N and downsamples
-#                   them to length N/2, using strided convolution
+#                   them to length N/amt, using strided convolution
 def downsample_block(num_chans, filt_size, amt = 2):
     def f(inp):
         shortcut = Conv1D(num_chans, filt_size, padding = 'same',
@@ -233,7 +231,7 @@ def residual_block(num_chans, filt_size, dilation = 1):
 # ---------------------------------------------------
 
 # entropy weight variable
-tau = K.variable(0.0001, name = "entropy_weight")
+tau = K.variable(0.0, name = "entropy_weight")
 
 def code_entropy(placeholder, code):
     # [BATCH_SIZE x QUANT_CHAN x NBINS]
