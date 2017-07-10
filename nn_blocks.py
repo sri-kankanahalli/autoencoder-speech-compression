@@ -58,8 +58,8 @@ class PhaseShiftUp1D(Layer):
 
 # both layers rely on the shared [QUANT_BINS] variable in consts.py
 
-# quantization: takes in    [BATCH x WINDOW_SIZE x QUANT_CHANS]
-#               and returns [BATCH x WINDOW_SIZE x QUANT_CHANS x NBINS]
+# quantization: takes in    [BATCH x WINDOW_SIZE x 1]
+#               and returns [BATCH x WINDOW_SIZE x NBINS]
 # where the last dimension is a one-hot vector of bins
 #
 # [bins initialization is in consts.py]
@@ -70,16 +70,16 @@ class SoftmaxQuantization(Layer):
         super(SoftmaxQuantization, self).build(input_shape)
         
     def call(self, x, mask=None):
-        # x is an array: [BATCH x WINDOW_SIZE x QUANT_CHANS]
-        # x_r becomes:   [BATCH x WINDOW_SIZE x QUANT_CHANS x 1]
-        x_r = K.reshape(x, (-1, x.shape[1], x.shape[2], 1))
+        # x is an array: [BATCH x WINDOW_SIZE]
+        # x_r becomes:   [BATCH x WINDOW_SIZE x 1]
+        x_r = K.reshape(x, (-1, x.shape[1], 1))
         
-        # QUANT_BINS is an array: [QUANT_CHANS x NBINS]
-        # q_r becomes:    [1 x 1 x QUANT_CHANS x NBINS]
-        q_r = K.reshape(QUANT_BINS, (1, 1, x.shape[2], -1))
+        # QUANT_BINS is an array: [NBINS]
+        # q_r becomes:    [1 x 1 x NBINS]
+        q_r = K.reshape(QUANT_BINS, (1, 1, -1))
         
         # get L1 distance from each element to each of the bins
-        # dist is: [BATCH x WINDOW_SIZE x QUANT_CHANS x NBINS]
+        # dist is: [BATCH x WINDOW_SIZE x NBINS]
         dist = K.abs(x_r - q_r)
         
         # turn into softmax probabilities, which we return
@@ -88,28 +88,28 @@ class SoftmaxQuantization(Layer):
         # if quantization is OFF, we just pass the input through unchanged
         # in a hack-y way
         quant_on = enc
-        quant_off = K.reshape(x, (-1, x.shape[1], x.shape[2], 1))
+        quant_off = K.reshape(x, (-1, x.shape[1], 1))
         quant_off = K.concatenate([quant_off,
-                                   K.zeros_like(enc)[:, :, :, 1:]], axis = 3)
+                                   K.zeros_like(enc)[:, :, 1:]], axis = 2)
         
         return K.switch(QUANTIZATION_ON, quant_on, quant_off)
     
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1], input_shape[2], NBINS)
+        return (input_shape[0], input_shape[1], NBINS)
 
-# dequantization: takes in    [BATCH x WINDOW_SIZE x QUANT_CHANS x NBINS]
-#                 and returns [BATCH x WINDOW_SIZE x QUANT_CHANS]
+# dequantization: takes in    [BATCH x WINDOW_SIZE x NBINS]
+#                 and returns [BATCH x WINDOW_SIZE x 1]
 class SoftmaxDequantization(Layer):
     def call(self, x, mask=None):
         dec = K.sum(x * QUANT_BINS, axis = -1)
-        dec = K.reshape(dec, (-1, dec.shape[1], dec.shape[2]))
+        dec = K.reshape(dec, (-1, dec.shape[1], 1))
 
         quant_on = dec
-        quant_off = K.reshape(x[:, :, :, :1], (-1, x.shape[1], x.shape[2]))
+        quant_off = K.reshape(x[:, :, :1], (-1, x.shape[1], 1))
         return K.switch(QUANTIZATION_ON, quant_on, quant_off)
     
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1], input_shape[2])
+        return (input_shape[0], input_shape[1], 1)
 
 # ---------------------------------------------------
 # "Blocks" that make up all of our models
@@ -121,6 +121,7 @@ def activation(init = 0.3):
     # so we share axis 1
     return PReLU(alpha_initializer = Constant(init),
                  shared_axes = [1])
+
 
 # channel change block: takes input from however many channels
 #                       it had before to [num_chans] channels,
@@ -233,31 +234,31 @@ def residual_block(num_chans, filt_size, dilation = 1):
 # entropy weight variable
 tau = K.variable(0.0, name = "entropy_weight")
 
+# NaN-safe RMSE loss function
+def rmse(y_true, y_pred):
+    mse = K.mean(K.square(y_pred - y_true), axis=-1)
+    return K.sqrt(mse + K.epsilon())
+
 def code_entropy(placeholder, code):
-    # [BATCH_SIZE x QUANT_CHAN x NBINS]
-    #     => [QUANT_CHANS x NBINS]
+    # [BATCH_SIZE x NBINS]
+    #     => [NBINS]
     # probability distribution over symbols for each channel
-    all_onehots = K.reshape(code, (-1, QUANT_CHANS, NBINS))
+    all_onehots = K.reshape(code, (-1,  NBINS))
     onehot_hist = K.sum(all_onehots, axis = 0)
-    onehot_hist /= K.sum(onehot_hist, axis = 1, keepdims = True)
+    onehot_hist /= K.sum(onehot_hist)
 
-    # entropy for each channel
-    channel_entropy = -K.sum(onehot_hist * K.log(onehot_hist + K.epsilon()) / K.log(2.0),
-                             axis = 1)
-
-    # total entropy
-    entropy = K.sum(channel_entropy)
-    
+    # compute entropy of probability distribution
+    entropy = -K.sum(onehot_hist * K.log(onehot_hist + K.epsilon()) / K.log(2.0))
     loss = tau * entropy
     return K.switch(QUANTIZATION_ON, loss, K.zeros_like(loss))
 
 def code_sparsity(placeholder, code):
-    # [BATCH_SIZE x CHANNEL_SIZE x QUANT_CHANS x NBINS]
-    #     => [BATCH_SIZE x CHANNEL_SIZE x QUANT_CHANS]
-    square_sum = K.sum(K.sqrt(code + K.epsilon()), axis = -1) - 1.0
+    # [BATCH_SIZE x CHANNEL_SIZE x NBINS]
+    #     => [BATCH_SIZE x CHANNEL_SIZE]
+    sqrt_sum = K.sum(K.sqrt(code + K.epsilon()), axis = -1) - 1.0
     
-    # take sum over channels, mean over sum
-    sparsity = K.mean(K.sum(square_sum, axis = -1), axis = -1)
+    # take mean over each soft assignment
+    sparsity = K.mean(sqrt_sum, axis = -1)
     return K.switch(QUANTIZATION_ON, sparsity, K.zeros_like(sparsity))
 
 

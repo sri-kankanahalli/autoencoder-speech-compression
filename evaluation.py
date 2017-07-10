@@ -26,10 +26,9 @@ def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     desired = np.clip(desired, -32767, 32767)
     
     # then, run NN on windows to get our model's reconstruction
-    transformed = np.reshape(windows, (windows.shape[0], WINDOW_SIZE, 1))
     enc = autoencoder.layers[1]
     
-    embed = enc.predict(transformed, batch_size = 128, verbose = 0)
+    embed = enc.predict(windows, batch_size = 128, verbose = 0)
     if (type(embed) is list or type(embed) is tuple):
         embed = embed[0]
 
@@ -40,7 +39,6 @@ def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     
     dec = autoencoder.layers[2]
     autoencOutput = dec.predict(embed, batch_size = 128, verbose = 0)
-    autoencOutput = np.reshape(autoencOutput, (autoencOutput.shape[0], WINDOW_SIZE))
     recons = reconstruct_from_windows(autoencOutput, OVERLAP_SIZE)
     recons = unpreprocess_waveform(recons, wparams)
     recons = np.clip(recons, -32767, 32767)

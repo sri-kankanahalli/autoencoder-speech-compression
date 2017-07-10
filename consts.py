@@ -9,6 +9,9 @@ from keras import backend as K
 # number of threads to use in our multithreaded code
 NUM_THREADS = 8
 
+# standard batch size
+BATCH_SIZE = 128
+
 # number of speech files for train, val, and test
 TRAIN_SIZE = 1000
 VAL_SIZE = 100
@@ -40,8 +43,7 @@ TIMIT_DIR = "/home/sri/Desktop/timit"
 
 # number of quantization bins, as well as initialization
 NBINS = 32
-QUANT_CHANS = 1
-BINS_INIT = np.tile(np.linspace(-1.0, 1.0, NBINS), (QUANT_CHANS, 1))
+BINS_INIT = np.linspace(-1.0, 1.0, NBINS)
 QUANT_BINS = K.variable(BINS_INIT, name = 'QUANT_BINS')
 
 # quantization is initially turned off
