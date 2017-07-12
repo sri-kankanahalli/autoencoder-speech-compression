@@ -1,0 +1,33 @@
+gating: none
+perceptual loss: combination of mel scales [8, 16, 32, 128]
+64 channels, filter size 9, non-bottleneck resnet
+32 bins, vec size 1, downsample factor 2
+trained for 300 epochs
+# params: 1,558,846 (742,447 encoder; 816,399 decoder)
+initial tau: 0.5
+initial softmax temperature: 500.0
+cosine annealing, initial LR 0.00025, final LR 0.0001
+
+architecture:
+    chng(NCHAN) => res(1) => res(2) => res(4) => res(8) => down =>
+                   res(1) => res(2) => res(4) => res(8) => chng(1)
+    chng(NCHAN) => res(1) => res(2) => res(4) => res(8) =>  up  =>
+                   res(1) => res(2) => res(4) => res(8) => chng(1)
+
+
+Model evaluation (training)
+Mean: 4.22361465859
+Max:  4.5452837944
+Min:  3.31619048119
+
+Model evaluation (validation)
+Mean: 4.33906421661
+Max:  4.54998111725
+Min:  4.03729152679
+
+Model evaluation (test)
+Mean: 4.23005755568
+Max:  4.5228228569
+Min:  2.71063256264
+
+

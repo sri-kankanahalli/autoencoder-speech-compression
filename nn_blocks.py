@@ -65,31 +65,29 @@ class PhaseShiftUp1D(Layer):
 # [bins initialization is in consts.py]
 class SoftmaxQuantization(Layer):
     def build(self, input_shape):
-        self.SOFTMAX_TEMP = K.constant(500.0)
-        self.trainable_weights = [QUANT_BINS]
+        self.SOFTMAX_TEMP = K.variable(500.0)
+        self.trainable_weights = [QUANT_BINS,
+                                  self.SOFTMAX_TEMP]
         super(SoftmaxQuantization, self).build(input_shape)
         
     def call(self, x, mask=None):
-        # x is an array: [BATCH x WINDOW_SIZE]
-        # x_r becomes:   [BATCH x WINDOW_SIZE x 1]
-        x_r = K.reshape(x, (-1, x.shape[1], 1))
-        
         # QUANT_BINS is an array: [NBINS]
         # q_r becomes:    [1 x 1 x NBINS]
         q_r = K.reshape(QUANT_BINS, (1, 1, -1))
         
         # get L1 distance from each element to each of the bins
-        # dist is: [BATCH x WINDOW_SIZE x NBINS]
-        dist = K.abs(x_r - q_r)
+        #     x is an array:   [BATCH x WINDOW_SIZE x 1]
+        #     q_r is an array: [1 x 1 x NBINS]
+        #     so dist is: [BATCH x WINDOW_SIZE x NBINS]
+        dist = K.abs(x - q_r)
         
-        # turn into softmax probabilities, which we return
+        # turn distances into soft bin assignments
         enc = softmax(self.SOFTMAX_TEMP * -dist)
         
-        # if quantization is OFF, we just pass the input through unchanged
-        # in a hack-y way
+        # if quantization is OFF, we just pass the input through unchanged,
+        # in a hackish way
         quant_on = enc
-        quant_off = K.reshape(x, (-1, x.shape[1], 1))
-        quant_off = K.concatenate([quant_off,
+        quant_off = K.concatenate([x,
                                    K.zeros_like(enc)[:, :, 1:]], axis = 2)
         
         return K.switch(QUANTIZATION_ON, quant_on, quant_off)
@@ -105,7 +103,7 @@ class SoftmaxDequantization(Layer):
         dec = K.reshape(dec, (-1, dec.shape[1], 1))
 
         quant_on = dec
-        quant_off = K.reshape(x[:, :, :1], (-1, x.shape[1], 1))
+        quant_off = x[:, :, :1]
         return K.switch(QUANTIZATION_ON, quant_on, quant_off)
     
     def compute_output_shape(self, input_shape):
@@ -117,15 +115,14 @@ class SoftmaxDequantization(Layer):
 
 # activation used in all blocks
 def activation(init = 0.3):
-    # input is of form [nbatch x channel_size x num_channels],
+    # input is of form [NBATCH x CHANNEL_SIZE x NUM_CHANNELS],
     # so we share axis 1
     return PReLU(alpha_initializer = Constant(init),
                  shared_axes = [1])
 
 
 # channel change block: takes input from however many channels
-#                       it had before to [num_chans] channels,
-#                       without applying any other operation
+#                       it had before to [num_chans] channels
 def channel_change_block(num_chans, filt_size):
     def f(inp):
         shortcut = Conv1D(num_chans, filt_size, padding = 'same',
@@ -150,20 +147,20 @@ def channel_change_block(num_chans, filt_size):
     return f
 
 # upsample block: takes input channels of length N and upsamples
-#                 them to length amt * N, using "phase shift" upsampling
-def upsample_block(num_chans, filt_size, amt = 2):
+#                 them to length 2N, using "phase shift" upsampling
+def upsample_block(num_chans, filt_size):
     def f(inp):
-        shortcut = Conv1D(num_chans * amt, filt_size, padding = 'same',
+        shortcut = Conv1D(num_chans * 2, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
                           activation = 'linear')(inp)
         shortcut = activation(0.3)(shortcut)
-        shortcut = PhaseShiftUp1D(amt)(shortcut)
+        shortcut = PhaseShiftUp1D(2)(shortcut)
 
-        out = Conv1D(num_chans * amt, filt_size, padding = 'same',
+        out = Conv1D(num_chans * 2, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(inp)
         out = activation(0.3)(out)
-        out = PhaseShiftUp1D(amt)(out)
+        out = PhaseShiftUp1D(2)(out)
 
         out = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
@@ -177,19 +174,19 @@ def upsample_block(num_chans, filt_size, amt = 2):
     return f
 
 # downsample block: takes input channels of length N and downsamples
-#                   them to length N/amt, using strided convolution
-def downsample_block(num_chans, filt_size, amt = 2):
+#                   them to length N/2, using strided convolution
+def downsample_block(num_chans, filt_size):
     def f(inp):
         shortcut = Conv1D(num_chans, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
                           activation = 'linear',
-                          strides = amt)(inp)
+                          strides = 2)(inp)
         shortcut = activation(0.3)(shortcut)
 
         out = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
-                     strides = amt)(inp)
+                     strides = 2)(inp)
         out = activation(0.3)(out)
 
         out = Conv1D(num_chans, filt_size, padding = 'same',
