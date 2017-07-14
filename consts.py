@@ -31,9 +31,6 @@ WINDOW_SIZE = 512
 OVERLAP_SIZE = 32
 STEP_SIZE = WINDOW_SIZE - OVERLAP_SIZE
 OVERLAP_FUNC = sig.hann(OVERLAP_SIZE * 2)
-WINDOWING_MULT = np.concatenate([OVERLAP_FUNC[:OVERLAP_SIZE],
-                                 np.ones(WINDOW_SIZE - OVERLAP_SIZE * 2),
-                                 OVERLAP_FUNC[OVERLAP_SIZE:]])
 
 # sample rate of input files
 SAMPLE_RATE = 16000

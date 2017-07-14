@@ -125,24 +125,25 @@ def activation(init = 0.3):
 #                       it had before to [num_chans] channels
 def channel_change_block(num_chans, filt_size):
     def f(inp):
+        shortcut = inp
+        res = inp
+
         shortcut = Conv1D(num_chans, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
-                          activation = 'linear')(inp)
+                          activation = 'linear')(shortcut)
         shortcut = activation(0.3)(shortcut)
 
-        out = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(inp)
-        out = activation(0.3)(out)
+                     activation = 'linear')(res)
+        res = activation(0.3)(res)
 
-        out = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(out)
-        out = activation(0.3)(out)
+                     activation = 'linear')(res)
+        res = activation(0.3)(res)
 
-        out = Add()([out, shortcut])
-
-        return out
+        return Add()([shortcut, res])
     
     return f
 
@@ -150,26 +151,27 @@ def channel_change_block(num_chans, filt_size):
 #                 them to length 2N, using "phase shift" upsampling
 def upsample_block(num_chans, filt_size):
     def f(inp):
+        shortcut = inp
+        res = inp
+
         shortcut = Conv1D(num_chans * 2, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
-                          activation = 'linear')(inp)
+                          activation = 'linear')(shortcut)
         shortcut = activation(0.3)(shortcut)
         shortcut = PhaseShiftUp1D(2)(shortcut)
 
-        out = Conv1D(num_chans * 2, filt_size, padding = 'same',
+        res = Conv1D(num_chans * 2, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(inp)
-        out = activation(0.3)(out)
-        out = PhaseShiftUp1D(2)(out)
+                     activation = 'linear')(res)
+        res = activation(0.3)(res)
+        res = PhaseShiftUp1D(2)(res)
 
-        out = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(out)
-        out = activation(0.3)(out)
-        
-        out = Add()([out, shortcut])
+                     activation = 'linear')(res)
+        res = activation(0.3)(res)
 
-        return out
+        return Add()([shortcut, res])
     
     return f
 
@@ -177,26 +179,27 @@ def upsample_block(num_chans, filt_size):
 #                   them to length N/2, using strided convolution
 def downsample_block(num_chans, filt_size):
     def f(inp):
+        shortcut = inp
+        res = inp
+
         shortcut = Conv1D(num_chans, filt_size, padding = 'same',
                           kernel_initializer = W_INIT,
                           activation = 'linear',
-                          strides = 2)(inp)
+                          strides = 2)(shortcut)
         shortcut = activation(0.3)(shortcut)
 
-        out = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
-                     strides = 2)(inp)
-        out = activation(0.3)(out)
+                     strides = 2)(res)
+        res = activation(0.3)(res)
 
-        out = Conv1D(num_chans, filt_size, padding = 'same',
+        res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
-                     activation = 'linear')(out)
-        out = activation(0.3)(out)
+                     activation = 'linear')(res)
+        res = activation(0.3)(res)
 
-        out = Add()([out, shortcut])
-
-        return out
+        return Add()([shortcut, res])
     
     return f
 
@@ -204,12 +207,13 @@ def downsample_block(num_chans, filt_size):
 def residual_block(num_chans, filt_size, dilation = 1):
     def f(inp):
         shortcut = inp
+        res = inp
 
         # conv1
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
-                     dilation_rate = dilation)(inp)
+                     dilation_rate = dilation)(res)
         res = activation(0.3)(res)
 
         # conv2
@@ -219,7 +223,7 @@ def residual_block(num_chans, filt_size, dilation = 1):
                      dilation_rate = dilation)(res)
         res = activation(0.3)(res)
 
-        return Add()([res, shortcut])
+        return Add()([shortcut, res])
     
     return f
 

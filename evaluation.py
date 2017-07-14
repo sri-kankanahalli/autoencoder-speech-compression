@@ -21,7 +21,7 @@ def np_avgErr(a, b):
 # return desired and reconstructed waveforms, from speech windows
 def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     # first, get desired reconstruction
-    desired = reconstruct_from_windows(windows, OVERLAP_SIZE)
+    desired = reconstruct_from_windows(windows, OVERLAP_SIZE, OVERLAP_FUNC)
     desired = unpreprocess_waveform(desired, wparams)
     desired = np.clip(desired, -32767, 32767)
     
@@ -39,7 +39,7 @@ def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     
     dec = autoencoder.layers[2]
     autoencOutput = dec.predict(embed, batch_size = 128, verbose = 0)
-    recons = reconstruct_from_windows(autoencOutput, OVERLAP_SIZE)
+    recons = reconstruct_from_windows(autoencOutput, OVERLAP_SIZE, OVERLAP_FUNC)
     recons = unpreprocess_waveform(recons, wparams)
     recons = np.clip(recons, -32767, 32767)
     
@@ -50,8 +50,7 @@ def run_model_on_wav(wave_filename, autoencoder, argmax = False):
     [rate, data] = sciwav.read(wave_filename)
     data = data.astype(np.float32)
     processed_wave, wparams = preprocess_waveform(data)
-    windows = extract_windows(processed_wave, STEP_SIZE, OVERLAP_SIZE,
-                              WINDOWING_MULT)
+    windows = extract_windows(processed_wave, STEP_SIZE, OVERLAP_SIZE)
     
     desired, recons = run_model_on_windows(windows, wparams, autoencoder, argmax)
     

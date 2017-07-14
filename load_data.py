@@ -204,13 +204,13 @@ def load_data(num_train, num_val, num_test,
 
     # turn each waveform into a corresponding list of windows
     train_windows = extract_windows_multiple(train_procwave, STEP_SIZE,
-                                             OVERLAP_SIZE, WINDOWING_MULT,
+                                             OVERLAP_SIZE,
                                              collapse = False)
     val_windows = extract_windows_multiple(val_procwave, STEP_SIZE,
-                                           OVERLAP_SIZE, WINDOWING_MULT,
+                                           OVERLAP_SIZE,
                                            collapse = False)
     test_windows = extract_windows_multiple(test_procwave, STEP_SIZE,
-                                            OVERLAP_SIZE, WINDOWING_MULT,
+                                            OVERLAP_SIZE,
                                             collapse = False)
 
     # construct return values
