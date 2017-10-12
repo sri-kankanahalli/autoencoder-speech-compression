@@ -6,22 +6,23 @@
 import numpy as np
 import math
 
+from consts import *
+
 # extract overlapping windows from waveform
-def extract_windows(data, stepSize, overlapSize):
-    numWindows = int(math.ceil(float(len(data)) / stepSize))
-    windowSize = stepSize + overlapSize
+def extract_windows(data):
+    numWindows = int(math.ceil(float(len(data)) / STEP_SIZE))
 
     # loop over every window
     windows = []
     for i in xrange(0, numWindows):
         # get the frame
-        startOfFrame = stepSize * i
-        endOfFrame = startOfFrame + windowSize
+        startOfFrame = STEP_SIZE * i
+        endOfFrame = startOfFrame + WINDOW_SIZE
         frame = data[startOfFrame:endOfFrame]
 
         # pad frame to proper size, if there's not enough data
-        if len(frame) < windowSize:
-            frame = np.pad(frame, (0, windowSize - len(frame)), \
+        if len(frame) < WINDOW_SIZE:
+            frame = np.pad(frame, (0, WINDOW_SIZE - len(frame)), \
                            'constant', constant_values=[0])
 
         if (i == 0):
@@ -31,11 +32,15 @@ def extract_windows(data, stepSize, overlapSize):
             windows = np.append(windows, tmp, axis = 0)
 
     windows = windows.astype(np.float32)
-    
+
+    if (EXTRACT_MODE == 0):
+        for i in xrange(0, windows.shape[0]):
+            windows[i] *= WINDOWING_MULT    
+
     return windows
 
 # reconstruct waveform from overlapping windows
-def reconstruct_from_windows(windows, overlapSize, overlapFunc):
+def reconstruct_from_windows(windows):
     reconstruction = []
     lastWindow = []
 
@@ -45,30 +50,33 @@ def reconstruct_from_windows(windows, overlapSize, overlapFunc):
         if (i == 0):
             reconstruction = r
         else:
-            overlapLastWindow = reconstruction[-overlapSize:]
-            overlapThisWindow = r[:overlapSize]
-            unmodifiedPart = r[overlapSize:]
+            overlapLastWindow = reconstruction[-OVERLAP_SIZE:]
+            overlapThisWindow = r[:OVERLAP_SIZE]
+            unmodifiedPart = r[OVERLAP_SIZE:]
 
             overlappedPart = np.copy(overlapLastWindow)
-            for j in xrange(0, overlapSize):
-                thisMult = overlapFunc[j]
-                lastMult = overlapFunc[j + overlapSize]
+            for j in xrange(0, OVERLAP_SIZE):
+                if (EXTRACT_MODE == 1):
+                    thisMult = OVERLAP_FUNC[j]
+                    lastMult = OVERLAP_FUNC[j + OVERLAP_SIZE]
+                else:
+                    thisMult = 1.0
+                    lastMult = 1.0
 
                 # use windowing function
                 overlappedPart[j] = overlapThisWindow[j] * thisMult + \
                                     overlapLastWindow[j] * lastMult
 
-            reconstruction[-overlapSize:] = overlappedPart
+            reconstruction[-OVERLAP_SIZE:] = overlappedPart
             reconstruction = np.concatenate([reconstruction, unmodifiedPart])
         
     return reconstruction
 
 # extract windows for list of waveforms
-def extract_windows_multiple(wavelist, stepSize, overlapSize,
-                             collapse = False):
+def extract_windows_multiple(wavelist, collapse = False):
     windowlist = []
     for waveform in wavelist:
-        windows = extract_windows(waveform, stepSize, overlapSize)
+        windows = extract_windows(waveform)
 
         if (windowlist == []):
             windowlist = [windows]

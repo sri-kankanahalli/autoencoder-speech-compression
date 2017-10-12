@@ -4,16 +4,15 @@
 
 import scipy.signal as sig
 import numpy as np
-from keras import backend as K
 
-# number of threads to use in our multithreaded code
+# number of threads to use in any CPU multithreaded code
 NUM_THREADS = 8
 
 # standard batch size
 BATCH_SIZE = 128
 
 # number of speech files for train, val, and test
-TRAIN_SIZE = 1000
+TRAIN_SIZE = 2000
 VAL_SIZE = 100
 TEST_SIZE = 500
 
@@ -31,6 +30,14 @@ WINDOW_SIZE = 512
 OVERLAP_SIZE = 32
 STEP_SIZE = WINDOW_SIZE - OVERLAP_SIZE
 OVERLAP_FUNC = sig.hann(OVERLAP_SIZE * 2)
+WINDOWING_MULT = np.concatenate([OVERLAP_FUNC[:OVERLAP_SIZE],
+                                 np.ones(WINDOW_SIZE - OVERLAP_SIZE * 2),
+                                 OVERLAP_FUNC[OVERLAP_SIZE:]])
+
+# extract mode:
+#     0 - apply overlap function during window extraction
+#     1 - apply overlap function during reconstruction
+EXTRACT_MODE = 0
 
 # sample rate of input files
 SAMPLE_RATE = 16000
@@ -38,12 +45,7 @@ SAMPLE_RATE = 16000
 # directory that contains TIMIT files
 TIMIT_DIR = "/home/sri/Desktop/timit"
 
-# number of quantization bins, as well as initialization
+# number of quantization bins
 NBINS = 32
-BINS_INIT = np.linspace(-1.0, 1.0, NBINS)
-QUANT_BINS = K.variable(BINS_INIT, name = 'QUANT_BINS')
-
-# quantization is initially turned off
-QUANTIZATION_ON = K.variable(False, name = 'QUANTIZATION_ON')
 
 

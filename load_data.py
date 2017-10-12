@@ -2,7 +2,8 @@
 # functions to load TIMIT .wavs, make train/val/test splits, and process
 # the dataset into speech windows
 #     (all WAV files are mono, 16KHz, 16-bit)
-# REQUIREMENT: you need to have run convert_TIMIT.py first
+# REQUIREMENT: you need to have run convert_TIMIT.py first, to convert the
+#              files from "NIST Sphere" format into something usable
 # ==========================================================================
 
 import subprocess
@@ -203,14 +204,11 @@ def load_data(num_train, num_val, num_test,
             pre_func(test_procwave[i])
 
     # turn each waveform into a corresponding list of windows
-    train_windows = extract_windows_multiple(train_procwave, STEP_SIZE,
-                                             OVERLAP_SIZE,
+    train_windows = extract_windows_multiple(train_procwave,
                                              collapse = False)
-    val_windows = extract_windows_multiple(val_procwave, STEP_SIZE,
-                                           OVERLAP_SIZE,
+    val_windows = extract_windows_multiple(val_procwave,
                                            collapse = False)
-    test_windows = extract_windows_multiple(test_procwave, STEP_SIZE,
-                                            OVERLAP_SIZE,
+    test_windows = extract_windows_multiple(test_procwave,
                                             collapse = False)
 
     # construct return values

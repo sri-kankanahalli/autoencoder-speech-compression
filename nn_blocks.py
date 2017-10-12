@@ -19,6 +19,10 @@ from keras.activations import softmax
 # weight initialization used in all layers of network
 W_INIT = 'he_normal'
 
+# Keras variables for quantization layers
+QUANT_BINS = K.variable(np.linspace(-1.0, 1.0, NBINS), name = 'QUANT_BINS')
+QUANTIZATION_ON = K.variable(False, name = 'QUANTIZATION_ON')
+
 # ---------------------------------------------------
 # 1D "phase shift" upsampling layer, as discussed in [that one
 # superresolution paper]
@@ -65,7 +69,7 @@ class PhaseShiftUp1D(Layer):
 # [bins initialization is in consts.py]
 class SoftmaxQuantization(Layer):
     def build(self, input_shape):
-        self.SOFTMAX_TEMP = K.variable(500.0)
+        self.SOFTMAX_TEMP = K.variable(200.0)
         self.trainable_weights = [QUANT_BINS,
                                   self.SOFTMAX_TEMP]
         super(SoftmaxQuantization, self).build(input_shape)
@@ -133,11 +137,13 @@ def channel_change_block(num_chans, filt_size):
                           activation = 'linear')(shortcut)
         shortcut = activation(0.3)(shortcut)
 
+        # conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
         res = activation(0.3)(res)
 
+        # conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
@@ -160,12 +166,14 @@ def upsample_block(num_chans, filt_size):
         shortcut = activation(0.3)(shortcut)
         shortcut = PhaseShiftUp1D(2)(shortcut)
 
+        # subpix conv
         res = Conv1D(num_chans * 2, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
         res = activation(0.3)(res)
         res = PhaseShiftUp1D(2)(res)
 
+        # conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
@@ -188,12 +196,14 @@ def downsample_block(num_chans, filt_size):
                           strides = 2)(shortcut)
         shortcut = activation(0.3)(shortcut)
 
+        # strided conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
                      strides = 2)(res)
         res = activation(0.3)(res)
 
+        # conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear')(res)
@@ -209,14 +219,14 @@ def residual_block(num_chans, filt_size, dilation = 1):
         shortcut = inp
         res = inp
 
-        # conv1
+        # conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
                      dilation_rate = dilation)(res)
         res = activation(0.3)(res)
 
-        # conv2
+        # conv
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',

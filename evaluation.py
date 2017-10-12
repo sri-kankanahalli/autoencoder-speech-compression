@@ -21,25 +21,22 @@ def np_avgErr(a, b):
 # return desired and reconstructed waveforms, from speech windows
 def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     # first, get desired reconstruction
-    desired = reconstruct_from_windows(windows, OVERLAP_SIZE, OVERLAP_FUNC)
+    desired = reconstruct_from_windows(windows)
     desired = unpreprocess_waveform(desired, wparams)
     desired = np.clip(desired, -32767, 32767)
     
     # then, run NN on windows to get our model's reconstruction
     enc = autoencoder.layers[1]
-    
-    embed = enc.predict(windows, batch_size = 128, verbose = 0)
-    if (type(embed) is list or type(embed) is tuple):
-        embed = embed[0]
+    dec = autoencoder.layers[2]
 
+    embed = enc.predict(windows, batch_size = 128, verbose = 0)
     if (argmax):
         for wnd in xrange(0, embed.shape[0]):
             max_idxs = np.argmax(embed[wnd], axis = -1)
             embed[wnd] = np.eye(NBINS)[max_idxs]
-    
-    dec = autoencoder.layers[2]
     autoencOutput = dec.predict(embed, batch_size = 128, verbose = 0)
-    recons = reconstruct_from_windows(autoencOutput, OVERLAP_SIZE, OVERLAP_FUNC)
+
+    recons = reconstruct_from_windows(autoencOutput)
     recons = unpreprocess_waveform(recons, wparams)
     recons = np.clip(recons, -32767, 32767)
     
@@ -50,7 +47,7 @@ def run_model_on_wav(wave_filename, autoencoder, argmax = False):
     [rate, data] = sciwav.read(wave_filename)
     data = data.astype(np.float32)
     processed_wave, wparams = preprocess_waveform(data)
-    windows = extract_windows(processed_wave, STEP_SIZE, OVERLAP_SIZE)
+    windows = extract_windows(processed_wave)
     
     desired, recons = run_model_on_windows(windows, wparams, autoencoder, argmax)
     
