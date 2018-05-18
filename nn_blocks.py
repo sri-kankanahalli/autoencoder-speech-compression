@@ -69,7 +69,7 @@ class PhaseShiftUp1D(Layer):
 # [bins initialization is in consts.py]
 class SoftmaxQuantization(Layer):
     def build(self, input_shape):
-        self.SOFTMAX_TEMP = K.variable(200.0)
+        self.SOFTMAX_TEMP = K.variable(300.0)
         self.trainable_weights = [QUANT_BINS,
                                   self.SOFTMAX_TEMP]
         super(SoftmaxQuantization, self).build(input_shape)
@@ -196,7 +196,7 @@ def downsample_block(num_chans, filt_size):
                           strides = 2)(shortcut)
         shortcut = activation(0.3)(shortcut)
 
-        # strided conv
+        # strided conv (res)
         res = Conv1D(num_chans, filt_size, padding = 'same',
                      kernel_initializer = W_INIT,
                      activation = 'linear',
@@ -263,7 +263,7 @@ def code_entropy(placeholder, code):
     loss = tau * entropy
     return K.switch(QUANTIZATION_ON, loss, K.zeros_like(loss))
 
-def code_sparsity(placeholder, code):
+def quantization_penalty(placeholder, code):
     # [BATCH_SIZE x CHANNEL_SIZE x NBINS]
     #     => [BATCH_SIZE x CHANNEL_SIZE]
     sqrt_sum = K.sum(K.sqrt(code + K.epsilon()), axis = -1) - 1.0

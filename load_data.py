@@ -137,7 +137,7 @@ def timit_train_test_val(num_train, num_val, num_test, val_spkr_pct = 0.25):
 # ---------------------------------------------------
 def load_raw_waveforms(lst):
     rawData = []
-    #i = 0
+
     for filepath in lst:
         [rate, data] = sciwav.read(filepath)
         data = data.astype(np.float32)
@@ -146,34 +146,31 @@ def load_raw_waveforms(lst):
             rawData = [data]
         else:
             rawData += [data]
-        
-        #print (str(i) + ": " + filepath + "\r"),
-        #i += 1
     
     return rawData
 
 # ---------------------------------------------------
 # waveform preprocessing functions
+#     preprocess: takes in waveforms in range [-32768, 32768]
+#                 maximizes their volume
+#                 and scales them to range [-1, 1]
+#     unpreprocess: scales back to [-32768, 32768]
 # ---------------------------------------------------
 def preprocess_waveform(waveform):
-    # scale waveform between -1 and 1 (maximizing its volume)
     mn = np.min(waveform)
     mx = np.max(waveform)
     maxabs = np.maximum(np.abs(mn), np.abs(mx))
-        
+
     return np.copy(waveform) / maxabs, (maxabs,)
 
 def unpreprocess_waveform(waveform, params):
-    return np.copy(waveform) * params[0]
+    return np.copy(waveform) * params[0]# * 32768.0
 
 # ---------------------------------------------------
 # load and process TIMIT data into speech windows
 # ---------------------------------------------------
 def load_data(num_train, num_val, num_test,
-              pre_func = None):
-    if (pre_func is None):
-        pre_func = preprocess_waveform
-
+              maximize_volume = True):
     # generate train/val/test split paths
     train_paths, val_paths, test_paths = \
         timit_train_test_val(num_train, num_val, num_test)
@@ -183,7 +180,7 @@ def load_data(num_train, num_val, num_test,
     val_waveforms = load_raw_waveforms(val_paths)
     test_waveforms = load_raw_waveforms(test_paths)
 
-    # waveform preprocessing in action
+    # waveform preprocessing
     train_procwave = np.copy(train_waveforms)
     val_procwave = np.copy(val_waveforms)
     test_procwave = np.copy(test_waveforms)
@@ -192,16 +189,15 @@ def load_data(num_train, num_val, num_test,
     val_wparams = [()] * len(val_procwave)
     test_wparams = [()] * len(test_procwave)
 
-    # preprocess every waveform
     for i in xrange(0, len(train_procwave)):
         train_procwave[i], train_wparams[i] = \
-            pre_func(train_procwave[i])
+            preprocess_waveform(train_procwave[i])
     for i in xrange(0, len(val_procwave)):
         val_procwave[i], val_wparams[i] = \
-            pre_func(val_procwave[i])
+            preprocess_waveform(val_procwave[i])
     for i in xrange(0, len(test_procwave)):
         test_procwave[i], test_wparams[i] = \
-            pre_func(test_procwave[i])
+            preprocess_waveform(test_procwave[i])
 
     # turn each waveform into a corresponding list of windows
     train_windows = extract_windows_multiple(train_procwave,

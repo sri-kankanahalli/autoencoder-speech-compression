@@ -12,8 +12,8 @@ NUM_THREADS = 8
 BATCH_SIZE = 128
 
 # number of speech files for train, val, and test
-TRAIN_SIZE = 2000
-VAL_SIZE = 100
+TRAIN_SIZE = 3000
+VAL_SIZE = 200
 TEST_SIZE = 500
 
 # randomly shuffle data before partitioning into training/validation?
@@ -23,7 +23,7 @@ RANDOM_SHUFFLE = True
 # is kind of expensive. so instead of selecting the full training and validation set, we
 # randomly select this many waveforms
 TRAIN_EVALUATE = 100
-VAL_EVALUATE = 100
+VAL_EVALUATE = 200
 
 # parameters for sliding window, and window function (triangular)
 WINDOW_SIZE = 512

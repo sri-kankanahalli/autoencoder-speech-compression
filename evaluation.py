@@ -14,7 +14,7 @@ import scipy.io.wavfile as sciwav
 def np_mse(a, b):
     return ((a - b) ** 2).mean(axis = None)
     
-# average error betwene two numpy arrays of the same size
+# average error between two numpy arrays of the same size
 def np_avgErr(a, b):
     return (abs(a - b)).mean(axis = None)
 
@@ -43,9 +43,11 @@ def run_model_on_windows(windows, wparams, autoencoder, argmax = False):
     return desired, recons
 
 # return desired and reconstructed waveforms, from .wav filename
-def run_model_on_wav(wave_filename, autoencoder, argmax = False):
+def run_model_on_wav(wave_filename, autoencoder,
+                     argmax = False):
     [rate, data] = sciwav.read(wave_filename)
     data = data.astype(np.float32)
+
     processed_wave, wparams = preprocess_waveform(data)
     windows = extract_windows(processed_wave)
     
